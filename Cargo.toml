@@ -1,0 +1,21 @@
+[package]
+name = "e06_sample_bot_structure"
+version = "0.1.0"
+authors = ["my name <my@email.address>"]
+edition = "2018"
+
+[dependencies]
+dotenv = "0.15"
+tracing = "0.1"
+tracing-subscriber = "0.2"
+tracing-futures = "0.2" # needed so intrument works with async functions.
+rand = "0.7.3"
+rand_pcg = "0.2.1"
+
+[dependencies.tokio]
+version = "0.2"
+features = ["macros", "signal"]
+
+[dependencies.serenity]
+features = ["cache", "collector", "framework", "standard_framework", "rustls_backend"]
+version = "0.9.2"
