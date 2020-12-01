@@ -1,6 +1,8 @@
+use serenity::builder::*;
 use serenity::framework::standard::{macros::command, CommandResult};
 use serenity::model::channel::*;
 use serenity::prelude::*;
+use serenity::utils::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum MoveResult {
@@ -76,6 +78,10 @@ fn number_emoji(num: usize) -> ReactionType {
     ReactionType::Unicode(format!("{}\u{fe0f}\u{20e3}", num))
 }
 
+fn infer<T, F: for<'a> Fn(&'a mut T) -> &'a mut T>(f: F) -> F {
+    f
+}
+
 #[command]
 async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
     let mut players = prompt.mentions.clone();
@@ -84,7 +90,13 @@ async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
     if players.len() != 2 {
         prompt
             .channel_id
-            .say(&ctx.http, "You need to tag another person to play against!")
+            .send_message(&ctx.http, |m| {
+                m.embed(|e| {
+                    e.title("Tic Tac Toe");
+                    e.colour(Colour::RED);
+                    e.description("You need to tag another person to play against!")
+                })
+            })
             .await?;
         return Ok(());
     }
@@ -92,9 +104,9 @@ async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
     let shapes = ['X', '@'];
 
     let msg_content = |field: &TTTField, turn| {
-        let mut msg = String::from("TicTacToe!\n");
-        msg += &format!(
-            "{} plays `{}`, {} plays `{}`\n",
+        let title = String::from("TicTacToe!\n");
+        let subtitle = format!(
+            "{} plays `{}`\n{} plays `{}`\n",
             players[0].mention(),
             shapes[0],
             players[1].mention(),
@@ -129,42 +141,57 @@ async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
             }
         }
 
-        // print grid
-        msg += "```\n";
+        // playing field string
+        let mut playing_field = String::from("```\n");
         for line in grid.iter() {
-            msg += &format!("{}\n", line.iter().collect::<String>());
+            playing_field += &format!("{}\n", line.iter().collect::<String>());
         }
-        msg += "```\n";
+        playing_field += "```\n";
 
-        if let Some(winner) = field.winner() {
-            msg += &format!("{} won!\n", players[winner as usize].mention());
-        } else if field.is_tied() {
-            msg += &format!("It's a tie!\n");
-        } else {
-            msg += &format!("`{}` plays next.\n", shapes[turn]);
-        }
-        msg
+        let footer_text = {
+            if let Some(winner) = field.winner() {
+                format!("{} won!\n", players[winner as usize].mention())
+            } else if field.is_tied() {
+                format!("It's a tie!\n")
+            } else {
+                format!("`{}` plays next.\n", shapes[turn])
+            }
+        };
+
+        infer(move |e: &mut CreateEmbed| {
+            let title = title.clone();
+            let subtitle = subtitle.clone();
+            let playing_field = playing_field.clone();
+            let footer_text = footer_text.clone();
+            e.title(title);
+            e.description(subtitle);
+            e.field("Field", playing_field, false);
+            e.field("Game Status", footer_text, false);
+            e
+        })
     };
 
     let mut field = TTTField::new();
 
-    let mut message = prompt
+    let mut game_msg = prompt
         .channel_id
-        .say(&ctx.http, msg_content(&field, 0))
+        .send_message(&ctx.http, |m| m.content("Loading..."))
         .await?;
 
     for i in 0..9 {
-        message.react(&ctx.http, number_emoji(i)).await?;
+        game_msg.react(&ctx.http, number_emoji(i)).await?;
     }
 
     'game: loop {
         for turn in 0..2 {
-            message
-                .edit(&ctx.http, |m| m.content(msg_content(&field, turn)))
+            game_msg
+                .edit(&ctx.http, |m| {
+                    m.content("").embed(|e| msg_content(&field, turn)(e))
+                })
                 .await?;
 
             let play = loop {
-                let reaction = message.await_reaction(&ctx.shard).await;
+                let reaction = game_msg.await_reaction(&ctx.shard).await;
                 if let Some(reaction) = reaction {
                     let reaction = reaction.as_inner_ref();
                     if Some(players[turn].id) != reaction.user_id {
@@ -190,8 +217,8 @@ async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
         }
     }
 
-    message
-        .edit(&ctx.http, |m| m.content(msg_content(&field, 0)))
+    game_msg
+        .edit(&ctx.http, |m| m.embed(|e| msg_content(&field, 0)(e)))
         .await?;
 
     Ok(())
