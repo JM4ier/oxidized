@@ -78,7 +78,7 @@ fn number_emoji(num: usize) -> ReactionType {
     ReactionType::Unicode(format!("{}\u{fe0f}\u{20e3}", num))
 }
 
-fn infer<T, F: for<'a> FnOnce(&'a mut T) -> &'a mut T>(f: F) -> F {
+fn infer<T, F: for<'a> Fn(&'a mut T) -> &'a mut T>(f: F) -> F {
     f
 }
 
@@ -175,7 +175,7 @@ async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
 
     let mut game_msg = prompt
         .channel_id
-        .send_message(&ctx.http, |m| m.embed(|e| e.title("Loading Game...")))
+        .send_message(&ctx.http, |m| m.content("Loading..."))
         .await?;
 
     for i in 0..9 {
@@ -185,7 +185,9 @@ async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
     'game: loop {
         for turn in 0..2 {
             game_msg
-                .edit(&ctx.http, |m| m.embed(|e| msg_content(&field, turn)(e)))
+                .edit(&ctx.http, |m| {
+                    m.content("").embed(|e| msg_content(&field, turn)(e))
+                })
                 .await?;
 
             let play = loop {
@@ -406,13 +408,7 @@ async fn ultimate(ctx: &Context, prompt: &Message) -> CommandResult {
     if players.len() != 2 {
         prompt
             .channel_id
-            .send_message(&ctx.http, |m| {
-                m.embed(|e| {
-                    e.title("Ultimate Tic Tac Toe");
-                    e.colour(Colour::RED);
-                    e.description("You need to tag another person to play agains!")
-                })
-            })
+            .say(&ctx.http, "You need to tag another person to play against!")
             .await?;
         return Ok(());
     }
@@ -420,34 +416,30 @@ async fn ultimate(ctx: &Context, prompt: &Message) -> CommandResult {
     let shapes = ['X', '@'];
     let mut game = UltimateGame::new();
 
-    let edit_embed = |game: &UltimateGame, turn: usize| {
-        let status = match game.status() {
-            GameStatus::Win(p) => format!("{} won!", players[p as usize].mention()),
-            GameStatus::Tie => String::from("It's a tie!"),
-            GameStatus::Running => format!("Next turn: `{}`", shapes[turn]),
-            _ => unreachable!(),
-        };
-
-        let drawn_field = game.draw(&shapes);
-        let description = format!(
-            "{} plays with `{}`\n{} plays with `{}`\n",
+    let msg_content = |game: &UltimateGame, turn: usize| {
+        let mut msg = format!(
+            "Ultimate TicTacToe!\n{} plays with `{}`, {} plays with `{}`\n",
             players[0].mention(),
             shapes[0],
             players[1].mention(),
             shapes[1]
         );
 
-        infer(move |e: &mut CreateEmbed| {
-            e.title("Ultimate Tic Tac Toe");
-            e.description(description);
-            e.field("Field", format!("```\n{}\n```\n", drawn_field), false);
-            e.field("Game Status", status, false)
-        })
+        msg += &format!("```\n{}\n```\n", game.draw(&shapes));
+
+        match game.status() {
+            GameStatus::Win(p) => msg += &format!("{} won!\n", players[p as usize].mention()),
+            GameStatus::Tie => msg += "It's a tie!\n",
+            GameStatus::Running => msg += &format!("Next turn: `{}`", shapes[turn]),
+            _ => unreachable!(),
+        };
+
+        msg
     };
 
     let mut message = prompt
         .channel_id
-        .send_message(&ctx.http, |m| m.embed(|e| e.title("Loading Game...")))
+        .say(&ctx.http, msg_content(&game, 0))
         .await?;
 
     for i in 1..10 {
@@ -456,7 +448,7 @@ async fn ultimate(ctx: &Context, prompt: &Message) -> CommandResult {
 
     'game: for turn in (0..2).cycle() {
         message
-            .edit(&ctx.http, |m| m.embed(edit_embed(&game, turn)))
+            .edit(&ctx.http, |m| m.content(msg_content(&game, turn)))
             .await?;
 
         let play = loop {
@@ -483,7 +475,7 @@ async fn ultimate(ctx: &Context, prompt: &Message) -> CommandResult {
     }
 
     message
-        .edit(&ctx.http, |m| m.embed(edit_embed(&game, 0)))
+        .edit(&ctx.http, |m| m.content(msg_content(&game, 0)))
         .await?;
 
     Ok(())
