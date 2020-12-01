@@ -1,11 +1,44 @@
+use crate::prelude::*;
 use serenity::framework::standard::{macros::command, CommandResult};
 use serenity::model::channel::*;
 use serenity::{futures::*, prelude::*};
+use std::time::*;
 
 #[command]
-#[help_available]
 async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.channel_id.say(&ctx.http, "Pong!").await?;
+    let before_ping = Instant::now();
+    let mut ping = msg
+        .channel_id
+        .send_message(&ctx.http, |m| m.embed(|e| e.title("Ping Stats")))
+        .await?;
+    let elapsed = before_ping.elapsed().as_millis();
+    ping.edit(&ctx.http, |m| {
+        m.embed(|e| {
+            e.title("Ping Stats");
+            e.field("Roundtrip", format!("`{}ms`", elapsed), false)
+        })
+    })
+    .await?;
+    Ok(())
+}
+
+#[command]
+async fn info(ctx: &Context, msg: &Message) -> CommandResult {
+    msg.channel_id
+        .send_message(&ctx.http, |m| {
+            m.embed(|e| {
+                e.title(format!("{} info page", NAME));
+                e.description("All the info you could want");
+                e.field(
+                    "Author",
+                    format!(" {} | <https://github.com/JM4ier>", DISCORD_AUTHOR),
+                    false,
+                );
+                e.field("Version", format!("{} v{}", NAME, VERSION), false);
+                e.field("Source", "Not yet available", false)
+            })
+        })
+        .await?;
     Ok(())
 }
 

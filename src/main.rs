@@ -54,7 +54,7 @@ async fn help(
 
 #[group]
 #[help_available]
-#[commands(ping, quit, solution, random, elthision, tictactoe, ultimate)]
+#[commands(info, ping, quit, solution, random, elthision, tictactoe, ultimate)]
 struct General;
 
 #[tokio::main]

@@ -228,9 +228,6 @@ fn field_status(field: &[Option<u8>; 9]) -> GameStatus {
         win_combos.push([i3, i3 + 1, i3 + 2]);
     }
     for combo in win_combos.iter() {
-        if field[combo[0]].is_none() {
-            continue;
-        }
         if field[combo[0]].is_some() && (0..3).all(|i| field[combo[i]] == field[combo[0]]) {
             return GameStatus::Win(field[combo[0]].unwrap());
         }
@@ -255,12 +252,9 @@ impl UltimateGame {
     fn status(&self) -> GameStatus {
         let mut wins = [None; 9];
         for i in 0..9 {
-            let status = field_status(&self.field[i]);
-            let win = match status {
-                GameStatus::Win(p) => Some(p),
-                _ => None,
-            };
-            wins[i] = win;
+            if let GameStatus::Win(p) = field_status(&self.field[i]) {
+                wins[i] = Some(p);
+            }
         }
         field_status(&wins)
     }
@@ -273,17 +267,22 @@ impl UltimateGame {
         self.cell = pos;
 
         // find next playable field
-        while self.cell < 9 {
-            if field_status(&self.field[self.cell]) != GameStatus::Running {
-                self.cell += 1;
-            } else {
+        for i in 0..9 {
+            let cell_i = (self.cell + i) % 9;
+            if field_status(&self.field[cell_i]) == GameStatus::Running {
+                self.cell = cell_i;
                 break;
             }
         }
 
+        // don't display a selection box if the game is finished
+        if self.status().is_finished() {
+            self.cell = 10;
+        }
+
         self.status()
     }
-    fn draw(&self, symbols: &[char], draw_selection: bool) -> String {
+    fn draw(&self, symbols: &[char]) -> String {
         let numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
         let selection = '*';
         let mut field = vec![vec![' '; 55]; 29];
@@ -345,7 +344,7 @@ impl UltimateGame {
                 field[yf - 1][xf - 1] = numbers[Self::flatten_xy(x, y)];
 
                 // draw selection
-                if self.cell == Self::flatten_xy(x, y) && draw_selection {
+                if self.cell == Self::flatten_xy(x, y) {
                     let xe = xf + 12;
                     let ye = yf + 6;
                     for y in yf..=ye {
@@ -368,6 +367,13 @@ impl UltimateGame {
 }
 
 #[command]
+#[only_in(guilds)]
+#[description(
+    "You play on a 3x3 grid of tictactoe fields.
+Where you move in the small field determines which field your opponent is going to play in next.
+A win in a small field counts as a mark on the big field.
+You win if you have three in a row, column or diagonal in the big field."
+)]
 async fn ultimate(ctx: &Context, prompt: &Message) -> CommandResult {
     let mut players = prompt.mentions.clone();
     players.push(prompt.author.clone());
@@ -392,7 +398,7 @@ async fn ultimate(ctx: &Context, prompt: &Message) -> CommandResult {
             shapes[1]
         );
 
-        msg += &format!("```\n{}\n```\n", game.draw(&shapes, true));
+        msg += &format!("```\n{}\n```\n", game.draw(&shapes));
 
         match game.status() {
             GameStatus::Win(p) => msg += &format!("{} won!\n", players[p as usize].mention()),
