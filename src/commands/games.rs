@@ -225,7 +225,7 @@ async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
 }
 
 struct UltimateGame {
-    field: [[Option<u8>; 9]; 9],
+    field: [SmallField; 9],
     cell: usize,
 }
 
@@ -247,23 +247,54 @@ impl GameStatus {
     }
 }
 
-fn field_status(field: &[Option<u8>; 9]) -> GameStatus {
-    let mut win_combos = vec![[0, 4, 8], [2, 4, 6]];
-    for i in 0..3 {
-        let i3 = 3 * i;
-        win_combos.push([i, i + 3, i + 6]);
-        win_combos.push([i3, i3 + 1, i3 + 2]);
-    }
-    for combo in win_combos.iter() {
-        if field[combo[0]].is_some() && (0..3).all(|i| field[combo[i]] == field[combo[0]]) {
-            return GameStatus::Win(field[combo[0]].unwrap());
+type SmallField = [Option<u8>; 9];
+
+trait Status {
+    fn status(&self) -> GameStatus;
+    fn winner(&self) -> Option<u8> {
+        if let GameStatus::Win(winner) = self.status() {
+            Some(winner)
+        } else {
+            None
         }
     }
-    if field.iter().all(|e| e.is_some()) {
-        GameStatus::Tie
-    } else {
-        GameStatus::Running
+}
+
+impl Status for SmallField {
+    fn status(&self) -> GameStatus {
+        let mut win_combos = vec![[0, 4, 8], [2, 4, 6]];
+        for i in 0..3 {
+            let i3 = 3 * i;
+            win_combos.push([i, i + 3, i + 6]);
+            win_combos.push([i3, i3 + 1, i3 + 2]);
+        }
+        for combo in win_combos.iter() {
+            if self[combo[0]].is_some() && (0..3).all(|i| self[combo[i]] == self[combo[0]]) {
+                return GameStatus::Win(self[combo[0]].unwrap());
+            }
+        }
+        if self.iter().all(|e| e.is_some()) {
+            GameStatus::Tie
+        } else {
+            GameStatus::Running
+        }
     }
+}
+
+impl Status for UltimateGame {
+    fn status(&self) -> GameStatus {
+        let mut wins = [None; 9];
+        for i in 0..9 {
+            if let GameStatus::Win(p) = self.field[i].status() {
+                wins[i] = Some(p);
+            }
+        }
+        wins.status()
+    }
+}
+
+fn flatten_xy(x: usize, y: usize) -> usize {
+    3 * y + x
 }
 
 impl UltimateGame {
@@ -272,18 +303,6 @@ impl UltimateGame {
             field: Default::default(),
             cell: 0,
         }
-    }
-    fn flatten_xy(x: usize, y: usize) -> usize {
-        3 * y + x
-    }
-    fn status(&self) -> GameStatus {
-        let mut wins = [None; 9];
-        for i in 0..9 {
-            if let GameStatus::Win(p) = field_status(&self.field[i]) {
-                wins[i] = Some(p);
-            }
-        }
-        field_status(&wins)
     }
     fn make_move(&mut self, pos: usize, player: u8) -> GameStatus {
         if self.field[self.cell][pos].is_some() {
@@ -296,7 +315,7 @@ impl UltimateGame {
         // find next playable field
         for i in 0..9 {
             let cell_i = (self.cell + i) % 9;
-            if field_status(&self.field[cell_i]) == GameStatus::Running {
+            if self.field[cell_i].status() == GameStatus::Running {
                 self.cell = cell_i;
                 break;
             }
@@ -356,10 +375,10 @@ impl UltimateGame {
                 }
 
                 // draw numbers or symbols
-                let sub_field = self.field[Self::flatten_xy(x, y)];
+                let sub_field = self.field[flatten_xy(x, y)];
                 for x in 0..3 {
                     for y in 0..3 {
-                        let idx = Self::flatten_xy(x, y);
+                        let idx = flatten_xy(x, y);
                         if let Some(p) = sub_field[idx] {
                             let x = xf + 2 + 4 * x;
                             let y = yf + 1 + 2 * y;
@@ -368,10 +387,10 @@ impl UltimateGame {
                     }
                 }
 
-                field[yf - 1][xf - 1] = numbers[Self::flatten_xy(x, y)];
+                field[yf - 1][xf - 1] = numbers[flatten_xy(x, y)];
 
                 // draw selection
-                if self.cell == Self::flatten_xy(x, y) {
+                if self.cell == flatten_xy(x, y) {
                     let xe = xf + 12;
                     let ye = yf + 6;
                     for y in yf..=ye {
