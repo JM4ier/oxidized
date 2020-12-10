@@ -3,120 +3,14 @@ use serenity::builder::*;
 use serenity::framework::standard::{macros::command, CommandResult};
 use serenity::model::{channel::*, user::*};
 use serenity::prelude::*;
-use serenity::utils::*;
 
 fn number_emoji(num: usize) -> ReactionType {
     ReactionType::Unicode(format!("{}\u{fe0f}\u{20e3}", num))
 }
 
-fn infer<T, F: for<'a> Fn(&'a mut T) -> &'a mut T>(f: F) -> F {
-    f
-}
-
 #[command]
 async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
-    let mut players = prompt.mentions.clone();
-    players.push(prompt.author.clone());
-
-    if players.len() != 2 {
-        prompt
-            .channel_id
-            .send_message(&ctx.http, |m| {
-                m.embed(|e| {
-                    e.title("Tic Tac Toe");
-                    e.colour(Colour::RED);
-                    e.description("You need to tag another person to play against!")
-                })
-            })
-            .await?;
-        return Ok(());
-    }
-
-    let shapes = ['X', '@'];
-
-    let msg_content = |field: &SmallField, turn| {
-        let title = String::from("TicTacToe!\n");
-        let subtitle = format!(
-            "{} plays `{}`\n{} plays `{}`\n",
-            players[0].mention(),
-            shapes[0],
-            players[1].mention(),
-            shapes[1]
-        );
-
-        let playing_field = format!("```\n{}\n```\n", field.draw(&shapes));
-
-        let footer_text = {
-            if let Some(winner) = field.winner() {
-                format!("{} won!\n", players[winner].mention())
-            } else if field.status() == GameState::Tie {
-                format!("It's a tie!\n")
-            } else {
-                format!("`{}` plays next.\n", shapes[turn])
-            }
-        };
-
-        infer(move |e: &mut CreateEmbed| {
-            let title = title.clone();
-            let subtitle = subtitle.clone();
-            let playing_field = playing_field.clone();
-            let footer_text = footer_text.clone();
-            e.title(title);
-            e.description(subtitle);
-            e.field("Field", playing_field, false);
-            e.field("Game Status", footer_text, false);
-            e
-        })
-    };
-
-    let mut field = SmallField::default();
-
-    let mut game_msg = prompt
-        .channel_id
-        .send_message(&ctx.http, |m| m.content("Loading..."))
-        .await?;
-
-    for i in 0..9 {
-        game_msg.react(&ctx.http, number_emoji(i)).await?;
-    }
-
-    'game: loop {
-        for turn in 0..2 {
-            game_msg
-                .edit(&ctx.http, |m| {
-                    m.content("").embed(|e| msg_content(&field, turn)(e))
-                })
-                .await?;
-
-            let play = loop {
-                let reaction = game_msg.await_reaction(&ctx.shard).await;
-                if let Some(reaction) = reaction {
-                    let reaction = reaction.as_inner_ref();
-                    if Some(players[turn].id) != reaction.user_id {
-                        // it is not the current player who has reacted
-                        continue;
-                    }
-
-                    if let Some(num) = (0..9).map(number_emoji).position(|e| e == reaction.emoji) {
-                        let state = field.make_move(num, turn);
-                        if state != GameState::Invalid {
-                            break state;
-                        }
-                    }
-                }
-            };
-
-            if play.is_finished() {
-                break 'game;
-            }
-        }
-    }
-
-    game_msg
-        .edit(&ctx.http, |m| m.embed(|e| msg_content(&field, 0)(e)))
-        .await?;
-
-    Ok(())
+    pvp_game(ctx, prompt, SmallField::default()).await
 }
 
 struct UltimateGame {
@@ -233,6 +127,46 @@ impl Draw for SmallField {
             playing_field += &format!("{}\n", line.iter().collect::<String>());
         }
         playing_field
+    }
+}
+
+impl PvpGame for SmallField {
+    fn reactions() -> Vec<ReactionType> {
+        (1..10).map(number_emoji).collect()
+    }
+    fn edit_message<'e>(&self, m: &'e mut EditMessage, ctx: &GameContext) -> &'e mut EditMessage {
+        let title = String::from("TicTacToe!\n");
+        let subtitle = format!(
+            "{} plays `{}`\n{} plays `{}`\n",
+            ctx.players[0].mention(),
+            ctx.shapes[0],
+            ctx.players[1].mention(),
+            ctx.shapes[1]
+        );
+
+        let playing_field = format!("```\n{}\n```\n", self.draw(&ctx.shapes));
+
+        let footer_text = {
+            if let Some(winner) = self.winner() {
+                format!("{} won!\n", ctx.players[winner].mention())
+            } else if self.status() == GameState::Tie {
+                format!("It's a tie!\n")
+            } else {
+                format!("`{}` plays next.\n", ctx.shapes[ctx.turn])
+            }
+        };
+
+        m.embed(|e| {
+            let title = title.clone();
+            let subtitle = subtitle.clone();
+            let playing_field = playing_field.clone();
+            let footer_text = footer_text.clone();
+            e.title(title);
+            e.description(subtitle);
+            e.field("Field", playing_field, false);
+            e.field("Game Status", footer_text, false);
+            e
+        })
     }
 }
 
@@ -413,6 +347,7 @@ impl GameContext {
     }
 }
 
+/// Plays a PvpGame where two people play against each other
 async fn pvp_game<G: PvpGame>(ctx: &Context, prompt: &Message, mut game: G) -> CommandResult {
     let mut players = prompt.mentions.clone();
     players.push(prompt.author.clone());
