@@ -114,7 +114,7 @@ impl Draw for SmallField {
             for col in 0..3 {
                 let idx = flatten_xy(col, row);
                 let ch = match self[idx] {
-                    None => std::char::from_digit((3 * row + col) as u32, 10).unwrap(),
+                    None => std::char::from_digit(1 + (3 * row + col) as u32, 10).unwrap(),
                     Some(p) => player_symbols[p],
                 };
                 grid[2 * row][1 + 4 * col] = ch;
