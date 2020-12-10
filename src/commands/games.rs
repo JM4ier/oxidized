@@ -48,7 +48,7 @@ async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
 
         let footer_text = {
             if let Some(winner) = field.winner() {
-                format!("{} won!\n", players[winner as usize].mention())
+                format!("{} won!\n", players[winner].mention())
             } else if field.status() == GameState::Tie {
                 format!("It's a tie!\n")
             } else {
@@ -98,7 +98,7 @@ async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
                     }
 
                     if let Some(num) = (0..9).map(number_emoji).position(|e| e == reaction.emoji) {
-                        let state = field.make_move(num, turn as u8);
+                        let state = field.make_move(num, turn);
                         if state != GameState::Invalid {
                             break state;
                         }
@@ -129,7 +129,7 @@ enum GameState {
     Running,
     Tie,
     Invalid,
-    Win(u8),
+    Win(usize),
 }
 
 impl GameState {
@@ -142,11 +142,11 @@ impl GameState {
     }
 }
 
-type SmallField = [Option<u8>; 9];
+type SmallField = [Option<usize>; 9];
 
 trait Status {
     fn status(&self) -> GameState;
-    fn winner(&self) -> Option<u8> {
+    fn winner(&self) -> Option<usize> {
         if let GameState::Win(winner) = self.status() {
             Some(winner)
         } else {
@@ -156,7 +156,7 @@ trait Status {
 }
 
 trait Move {
-    fn make_move(&mut self, idx: usize, person: u8) -> GameState;
+    fn make_move(&mut self, idx: usize, person: usize) -> GameState;
 }
 trait Draw {
     fn draw(&self, player_symbols: &[char]) -> String;
@@ -184,7 +184,7 @@ impl Status for SmallField {
 }
 
 impl Move for SmallField {
-    fn make_move(&mut self, idx: usize, person: u8) -> GameState {
+    fn make_move(&mut self, idx: usize, person: usize) -> GameState {
         if idx >= self.len() {
             GameState::Invalid
         } else if self[idx].is_some() {
@@ -221,7 +221,7 @@ impl Draw for SmallField {
                 let idx = flatten_xy(col, row);
                 let ch = match self[idx] {
                     None => std::char::from_digit((3 * row + col) as u32, 10).unwrap(),
-                    Some(p) => player_symbols[p as usize],
+                    Some(p) => player_symbols[p],
                 };
                 grid[2 * row][1 + 4 * col] = ch;
             }
@@ -249,7 +249,7 @@ impl Status for UltimateGame {
 }
 
 impl Move for UltimateGame {
-    fn make_move(&mut self, pos: usize, player: u8) -> GameState {
+    fn make_move(&mut self, pos: usize, player: usize) -> GameState {
         if self.field[self.cell][pos].is_some() {
             return GameState::Invalid;
         }
@@ -288,9 +288,9 @@ impl PvpGame for UltimateGame {
         msg += &format!("```\n{}\n```\n", self.draw(&ctx.shapes));
 
         match self.status() {
-            GameState::Win(p) => msg += &format!("{} won!\n", ctx.players[p as usize].mention()),
+            GameState::Win(p) => msg += &format!("{} won!\n", ctx.players[p].mention()),
             GameState::Tie => msg += "It's a tie!\n",
-            GameState::Running => msg += &format!("Next turn: `{}`", ctx.shapes[ctx.turn as usize]),
+            GameState::Running => msg += &format!("Next turn: `{}`", ctx.shapes[ctx.turn]),
             _ => unreachable!(),
         };
 
@@ -366,7 +366,7 @@ impl UltimateGame {
                         if let Some(p) = sub_field[idx] {
                             let x = xf + 2 + 4 * x;
                             let y = yf + 1 + 2 * y;
-                            field[y][x] = symbols[p as usize];
+                            field[y][x] = symbols[p];
                         }
                     }
                 }
@@ -404,7 +404,13 @@ trait PvpGame: Status + Move {
 struct GameContext {
     players: Vec<User>,
     shapes: Vec<char>,
-    turn: u8,
+    turn: usize,
+}
+
+impl GameContext {
+    fn next_turn(&mut self) {
+        self.turn = 1 - self.turn;
+    }
 }
 
 async fn pvp_game<G: PvpGame>(ctx: &Context, prompt: &Message, mut game: G) -> CommandResult {
@@ -431,7 +437,7 @@ async fn pvp_game<G: PvpGame>(ctx: &Context, prompt: &Message, mut game: G) -> C
         turn: 0,
     };
 
-    'game: loop {
+    loop {
         message
             .edit(&ctx.http, |m| game.edit_message(m, &game_ctx))
             .await?;
@@ -442,23 +448,24 @@ async fn pvp_game<G: PvpGame>(ctx: &Context, prompt: &Message, mut game: G) -> C
             let reaction = reaction.as_inner_ref();
 
             // check player who has reacted
-            if Some(game_ctx.players[game_ctx.turn as usize].id) != reaction.user_id {
+            if Some(game_ctx.players[game_ctx.turn].id) != reaction.user_id {
                 continue;
             }
 
             // if it is one of the given emojis, try to make that move
             let idx = tryc!(G::reactions().into_iter().position(|e| e == reaction.emoji));
 
-            let state = game.make_move(idx, game_ctx.turn as u8);
+            let state = game.make_move(idx, game_ctx.turn);
             if state != GameState::Invalid {
                 break state;
             }
         };
 
         if play.is_finished() {
-            break 'game;
+            break;
+        } else {
+            game_ctx.next_turn();
         }
-        game_ctx.turn = 1 - game_ctx.turn;
     }
 
     message
@@ -476,83 +483,5 @@ A win in a small field counts as a mark on the big field.
 You win if you have three in a row, column or diagonal in the big field."
 )]
 async fn ultimate(ctx: &Context, prompt: &Message) -> CommandResult {
-    return pvp_game(ctx, prompt, UltimateGame::new()).await;
-
-    let mut players = prompt.mentions.clone();
-    players.push(prompt.author.clone());
-
-    if players.len() != 2 {
-        prompt
-            .channel_id
-            .say(&ctx.http, "You need to tag another person to play against!")
-            .await?;
-        return Ok(());
-    }
-
-    let shapes = ['X', '@'];
-    let mut game = UltimateGame::new();
-
-    let msg_content = |game: &UltimateGame, turn: usize| {
-        let mut msg = format!(
-            "Ultimate TicTacToe!\n{} plays with `{}`, {} plays with `{}`\n",
-            players[0].mention(),
-            shapes[0],
-            players[1].mention(),
-            shapes[1]
-        );
-
-        msg += &format!("```\n{}\n```\n", game.draw(&shapes));
-
-        match game.status() {
-            GameState::Win(p) => msg += &format!("{} won!\n", players[p as usize].mention()),
-            GameState::Tie => msg += "It's a tie!\n",
-            GameState::Running => msg += &format!("Next turn: `{}`", shapes[turn]),
-            _ => unreachable!(),
-        };
-
-        msg
-    };
-
-    let mut message = prompt
-        .channel_id
-        .say(&ctx.http, msg_content(&game, 0))
-        .await?;
-
-    for i in 1..10 {
-        message.react(&ctx.http, number_emoji(i)).await?;
-    }
-
-    'game: for turn in (0..2).cycle() {
-        message
-            .edit(&ctx.http, |m| m.content(msg_content(&game, turn)))
-            .await?;
-
-        let play = loop {
-            let reaction = message.await_reaction(&ctx.shard).await;
-            if let Some(reaction) = reaction {
-                let reaction = reaction.as_inner_ref();
-                if Some(players[turn].id) != reaction.user_id {
-                    // it is not the current player who has reacted
-                    continue;
-                }
-
-                if let Some(num) = (1..10).map(number_emoji).position(|e| e == reaction.emoji) {
-                    let state = game.make_move(num, turn as u8);
-                    if state != GameState::Invalid {
-                        break state;
-                    }
-                }
-            }
-        };
-
-        if play.is_finished() {
-            break 'game;
-        }
-    }
-
-    message
-        .edit(&ctx.http, |m| m.content(msg_content(&game, 0)))
-        .await?;
-
-    Ok(())
+    pvp_game(ctx, prompt, UltimateGame::new()).await
 }

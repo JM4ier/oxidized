@@ -10,7 +10,6 @@ pub const DISCORD_AUTHOR: &'static str = "<@!177498563637542921>";
 pub trait MessageArgs {
     fn args(&self) -> Args;
 }
-
 impl MessageArgs for Message {
     fn args(&self) -> Args {
         let delimiter = [Delimiter::Single(' ')];
@@ -20,6 +19,9 @@ impl MessageArgs for Message {
     }
 }
 
+// Tries to Pattern match an option
+//
+// If it fails, it continues in the next loop iteration
 #[macro_export]
 macro_rules! tryc {
     ($maybe:expr) => {
