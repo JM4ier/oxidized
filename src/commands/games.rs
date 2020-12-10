@@ -4,76 +4,6 @@ use serenity::model::channel::*;
 use serenity::prelude::*;
 use serenity::utils::*;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum MoveResult {
-    Win,
-    Tie,
-    Invalid,
-    Continue,
-}
-
-struct TTTField {
-    field: [[Option<u8>; 3]; 3],
-}
-
-impl TTTField {
-    fn new() -> Self {
-        Self {
-            field: Default::default(),
-        }
-    }
-    fn is_tied(&self) -> bool {
-        self.is_filled() && !self.winner().is_some()
-    }
-    fn is_filled(&self) -> bool {
-        self.field.iter().flatten().all(|e| e.is_some())
-    }
-    fn winner(&self) -> Option<u8> {
-        let f = &self.field;
-        for a in 0..3 {
-            let (mut row_full, mut col_full) = (f[a][0].is_some(), f[0][a].is_some());
-            for b in 0..3 {
-                row_full &= f[a][b] == f[a][0];
-                col_full &= f[b][a] == f[0][a];
-            }
-            if row_full {
-                return f[a][0];
-            } else if col_full {
-                return f[0][a];
-            }
-        }
-
-        let (mut diag1, mut diag2) = (f[0][0].is_some(), f[0][2].is_some());
-        for i in 0..3 {
-            diag1 &= f[i][i] == f[0][0];
-            diag2 &= f[2 - i][i] == f[2][0];
-        }
-        if diag1 {
-            self.field[0][0]
-        } else if diag2 {
-            self.field[0][2]
-        } else {
-            None
-        }
-    }
-    fn make_move(&mut self, x: usize, y: usize, player: u8) -> MoveResult {
-        if x >= 3 || y >= 3 {
-            MoveResult::Invalid
-        } else if self.field[x][y].is_some() {
-            MoveResult::Invalid
-        } else {
-            self.field[x][y] = Some(player);
-            if self.winner() == Some(player) {
-                MoveResult::Win
-            } else if self.is_filled() {
-                MoveResult::Tie
-            } else {
-                MoveResult::Continue
-            }
-        }
-    }
-}
-
 fn number_emoji(num: usize) -> ReactionType {
     ReactionType::Unicode(format!("{}\u{fe0f}\u{20e3}", num))
 }
@@ -103,7 +33,7 @@ async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
 
     let shapes = ['X', '@'];
 
-    let msg_content = |field: &TTTField, turn| {
+    let msg_content = |field: &SmallField, turn| {
         let title = String::from("TicTacToe!\n");
         let subtitle = format!(
             "{} plays `{}`\n{} plays `{}`\n",
@@ -133,7 +63,8 @@ async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
 
         for row in 0..3 {
             for col in 0..3 {
-                let ch = match field.field[row][col] {
+                let idx = flatten_xy(col, row);
+                let ch = match field[idx] {
                     None => std::char::from_digit((3 * row + col) as u32, 10).unwrap(),
                     Some(p) => shapes[p as usize],
                 };
@@ -151,7 +82,7 @@ async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
         let footer_text = {
             if let Some(winner) = field.winner() {
                 format!("{} won!\n", players[winner as usize].mention())
-            } else if field.is_tied() {
+            } else if field.status() == GameState::Tie {
                 format!("It's a tie!\n")
             } else {
                 format!("`{}` plays next.\n", shapes[turn])
@@ -171,7 +102,7 @@ async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
         })
     };
 
-    let mut field = TTTField::new();
+    let mut field = SmallField::default();
 
     let mut game_msg = prompt
         .channel_id
@@ -200,18 +131,15 @@ async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
                     }
 
                     if let Some(num) = (0..9).map(number_emoji).position(|e| e == reaction.emoji) {
-                        let row = num / 3;
-                        let col = num % 3;
-
-                        let state = field.make_move(row, col, turn as u8);
-                        if state != MoveResult::Invalid {
+                        let state = field.make_move(num, turn as u8);
+                        if state != GameState::Invalid {
                             break state;
                         }
                     }
                 }
             };
 
-            if play == MoveResult::Win || play == MoveResult::Tie {
+            if play.is_finished() {
                 break 'game;
             }
         }
@@ -230,14 +158,14 @@ struct UltimateGame {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum GameStatus {
+enum GameState {
     Running,
     Tie,
     Invalid,
     Win(u8),
 }
 
-impl GameStatus {
+impl GameState {
     fn is_finished(&self) -> bool {
         match self {
             Self::Tie => true,
@@ -250,9 +178,9 @@ impl GameStatus {
 type SmallField = [Option<u8>; 9];
 
 trait Status {
-    fn status(&self) -> GameStatus;
+    fn status(&self) -> GameState;
     fn winner(&self) -> Option<u8> {
-        if let GameStatus::Win(winner) = self.status() {
+        if let GameState::Win(winner) = self.status() {
             Some(winner)
         } else {
             None
@@ -260,8 +188,12 @@ trait Status {
     }
 }
 
+trait Move {
+    fn make_move(&mut self, idx: usize, person: u8) -> GameState;
+}
+
 impl Status for SmallField {
-    fn status(&self) -> GameStatus {
+    fn status(&self) -> GameState {
         let mut win_combos = vec![[0, 4, 8], [2, 4, 6]];
         for i in 0..3 {
             let i3 = 3 * i;
@@ -270,22 +202,35 @@ impl Status for SmallField {
         }
         for combo in win_combos.iter() {
             if self[combo[0]].is_some() && (0..3).all(|i| self[combo[i]] == self[combo[0]]) {
-                return GameStatus::Win(self[combo[0]].unwrap());
+                return GameState::Win(self[combo[0]].unwrap());
             }
         }
         if self.iter().all(|e| e.is_some()) {
-            GameStatus::Tie
+            GameState::Tie
         } else {
-            GameStatus::Running
+            GameState::Running
+        }
+    }
+}
+
+impl Move for SmallField {
+    fn make_move(&mut self, idx: usize, person: u8) -> GameState {
+        if idx >= self.len() {
+            GameState::Invalid
+        } else if self[idx].is_some() {
+            GameState::Invalid
+        } else {
+            self[idx] = Some(person);
+            self.status()
         }
     }
 }
 
 impl Status for UltimateGame {
-    fn status(&self) -> GameStatus {
+    fn status(&self) -> GameState {
         let mut wins = [None; 9];
         for i in 0..9 {
-            if let GameStatus::Win(p) = self.field[i].status() {
+            if let GameState::Win(p) = self.field[i].status() {
                 wins[i] = Some(p);
             }
         }
@@ -304,9 +249,9 @@ impl UltimateGame {
             cell: 0,
         }
     }
-    fn make_move(&mut self, pos: usize, player: u8) -> GameStatus {
+    fn make_move(&mut self, pos: usize, player: u8) -> GameState {
         if self.field[self.cell][pos].is_some() {
-            return GameStatus::Invalid;
+            return GameState::Invalid;
         }
 
         self.field[self.cell][pos] = Some(player);
@@ -315,7 +260,7 @@ impl UltimateGame {
         // find next playable field
         for i in 0..9 {
             let cell_i = (self.cell + i) % 9;
-            if self.field[cell_i].status() == GameStatus::Running {
+            if self.field[cell_i].status() == GameState::Running {
                 self.cell = cell_i;
                 break;
             }
@@ -447,9 +392,9 @@ async fn ultimate(ctx: &Context, prompt: &Message) -> CommandResult {
         msg += &format!("```\n{}\n```\n", game.draw(&shapes));
 
         match game.status() {
-            GameStatus::Win(p) => msg += &format!("{} won!\n", players[p as usize].mention()),
-            GameStatus::Tie => msg += "It's a tie!\n",
-            GameStatus::Running => msg += &format!("Next turn: `{}`", shapes[turn]),
+            GameState::Win(p) => msg += &format!("{} won!\n", players[p as usize].mention()),
+            GameState::Tie => msg += "It's a tie!\n",
+            GameState::Running => msg += &format!("Next turn: `{}`", shapes[turn]),
             _ => unreachable!(),
         };
 
@@ -481,7 +426,7 @@ async fn ultimate(ctx: &Context, prompt: &Message) -> CommandResult {
 
                 if let Some(num) = (1..10).map(number_emoji).position(|e| e == reaction.emoji) {
                     let state = game.make_move(num, turn as u8);
-                    if state != GameStatus::Invalid {
+                    if state != GameState::Invalid {
                         break state;
                     }
                 }
