@@ -19,3 +19,14 @@ impl MessageArgs for Message {
         Args::new(args.rest(), &delimiter)
     }
 }
+
+#[macro_export]
+macro_rules! tryc {
+    ($maybe:expr) => {
+        if let Some(e) = $maybe {
+            e
+        } else {
+            continue;
+        }
+    };
+}

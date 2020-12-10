@@ -1,6 +1,7 @@
+use crate::tryc;
 use serenity::builder::*;
 use serenity::framework::standard::{macros::command, CommandResult};
-use serenity::model::channel::*;
+use serenity::model::{channel::*, user::*};
 use serenity::prelude::*;
 use serenity::utils::*;
 
@@ -43,41 +44,7 @@ async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
             shapes[1]
         );
 
-        let mut grid = vec![vec![' '; 11]; 5];
-
-        // vertical lines
-        for x in 0..2 {
-            let x = 3 + 4 * x;
-            for y in 0..5 {
-                grid[y][x] = '|';
-            }
-        }
-
-        // horizontal lines
-        for y in 0..2 {
-            let y = 1 + 2 * y;
-            for x in 0..11 {
-                grid[y][x] = if grid[y][x] == '|' { '+' } else { '-' };
-            }
-        }
-
-        for row in 0..3 {
-            for col in 0..3 {
-                let idx = flatten_xy(col, row);
-                let ch = match field[idx] {
-                    None => std::char::from_digit((3 * row + col) as u32, 10).unwrap(),
-                    Some(p) => shapes[p as usize],
-                };
-                grid[2 * row][1 + 4 * col] = ch;
-            }
-        }
-
-        // playing field string
-        let mut playing_field = String::from("```\n");
-        for line in grid.iter() {
-            playing_field += &format!("{}\n", line.iter().collect::<String>());
-        }
-        playing_field += "```\n";
+        let playing_field = format!("```\n{}\n```\n", field.draw(&shapes));
 
         let footer_text = {
             if let Some(winner) = field.winner() {
@@ -191,6 +158,9 @@ trait Status {
 trait Move {
     fn make_move(&mut self, idx: usize, person: u8) -> GameState;
 }
+trait Draw {
+    fn draw(&self, player_symbols: &[char]) -> String;
+}
 
 impl Status for SmallField {
     fn status(&self) -> GameState {
@@ -226,6 +196,46 @@ impl Move for SmallField {
     }
 }
 
+impl Draw for SmallField {
+    fn draw(&self, player_symbols: &[char]) -> String {
+        let mut grid = vec![vec![' '; 11]; 5];
+
+        // vertical lines
+        for x in 0..2 {
+            let x = 3 + 4 * x;
+            for y in 0..5 {
+                grid[y][x] = '|';
+            }
+        }
+
+        // horizontal lines
+        for y in 0..2 {
+            let y = 1 + 2 * y;
+            for x in 0..11 {
+                grid[y][x] = if grid[y][x] == '|' { '+' } else { '-' };
+            }
+        }
+
+        for row in 0..3 {
+            for col in 0..3 {
+                let idx = flatten_xy(col, row);
+                let ch = match self[idx] {
+                    None => std::char::from_digit((3 * row + col) as u32, 10).unwrap(),
+                    Some(p) => player_symbols[p as usize],
+                };
+                grid[2 * row][1 + 4 * col] = ch;
+            }
+        }
+
+        // playing field string
+        let mut playing_field = String::new();
+        for line in grid.iter() {
+            playing_field += &format!("{}\n", line.iter().collect::<String>());
+        }
+        playing_field
+    }
+}
+
 impl Status for UltimateGame {
     fn status(&self) -> GameState {
         let mut wins = [None; 9];
@@ -238,17 +248,7 @@ impl Status for UltimateGame {
     }
 }
 
-fn flatten_xy(x: usize, y: usize) -> usize {
-    3 * y + x
-}
-
-impl UltimateGame {
-    fn new() -> Self {
-        Self {
-            field: Default::default(),
-            cell: 0,
-        }
-    }
+impl Move for UltimateGame {
     fn make_move(&mut self, pos: usize, player: u8) -> GameState {
         if self.field[self.cell][pos].is_some() {
             return GameState::Invalid;
@@ -272,6 +272,45 @@ impl UltimateGame {
         }
 
         self.status()
+    }
+}
+
+impl PvpGame for UltimateGame {
+    fn edit_message<'e>(&self, m: &'e mut EditMessage, ctx: &GameContext) -> &'e mut EditMessage {
+        let mut msg = format!(
+            "Ultimate TicTacToe!\n{} plays with `{}`, {} plays with `{}`\n",
+            ctx.players[0].mention(),
+            ctx.shapes[0],
+            ctx.players[1].mention(),
+            ctx.shapes[1]
+        );
+
+        msg += &format!("```\n{}\n```\n", self.draw(&ctx.shapes));
+
+        match self.status() {
+            GameState::Win(p) => msg += &format!("{} won!\n", ctx.players[p as usize].mention()),
+            GameState::Tie => msg += "It's a tie!\n",
+            GameState::Running => msg += &format!("Next turn: `{}`", ctx.shapes[ctx.turn as usize]),
+            _ => unreachable!(),
+        };
+
+        m.content(msg)
+    }
+    fn reactions() -> Vec<ReactionType> {
+        (1..10).map(number_emoji).collect()
+    }
+}
+
+fn flatten_xy(x: usize, y: usize) -> usize {
+    3 * y + x
+}
+
+impl UltimateGame {
+    fn new() -> Self {
+        Self {
+            field: Default::default(),
+            cell: 0,
+        }
     }
     fn draw(&self, symbols: &[char]) -> String {
         let numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
@@ -357,6 +396,77 @@ impl UltimateGame {
     }
 }
 
+trait PvpGame: Status + Move {
+    fn edit_message<'e>(&self, m: &'e mut EditMessage, ctx: &GameContext) -> &'e mut EditMessage;
+    fn reactions() -> Vec<ReactionType>;
+}
+
+struct GameContext {
+    players: Vec<User>,
+    shapes: Vec<char>,
+    turn: u8,
+}
+
+async fn pvp_game<G: PvpGame>(ctx: &Context, prompt: &Message, mut game: G) -> CommandResult {
+    let mut players = prompt.mentions.clone();
+    players.push(prompt.author.clone());
+
+    if players.len() != 2 {
+        prompt
+            .channel_id
+            .say(&ctx.http, "You need to tag another person to play against!")
+            .await?;
+        return Ok(());
+    }
+
+    // create message and react
+    let mut message = prompt.channel_id.say(&ctx.http, "Loading Game...").await?;
+    for r in G::reactions() {
+        message.react(&ctx.http, r).await?;
+    }
+
+    let mut game_ctx = GameContext {
+        players,
+        shapes: vec!['X', '@'],
+        turn: 0,
+    };
+
+    'game: loop {
+        message
+            .edit(&ctx.http, |m| game.edit_message(m, &game_ctx))
+            .await?;
+
+        let play = loop {
+            let reaction = message.await_reaction(&ctx.shard).await;
+            let reaction = tryc!(reaction);
+            let reaction = reaction.as_inner_ref();
+
+            // check player who has reacted
+            if Some(game_ctx.players[game_ctx.turn as usize].id) != reaction.user_id {
+                continue;
+            }
+
+            // if it is one of the given emojis, try to make that move
+            let idx = tryc!(G::reactions().into_iter().position(|e| e == reaction.emoji));
+
+            let state = game.make_move(idx, game_ctx.turn as u8);
+            if state != GameState::Invalid {
+                break state;
+            }
+        };
+
+        if play.is_finished() {
+            break 'game;
+        }
+        game_ctx.turn = 1 - game_ctx.turn;
+    }
+
+    message
+        .edit(&ctx.http, |m| game.edit_message(m, &game_ctx))
+        .await?;
+    Ok(())
+}
+
 #[command]
 #[only_in(guilds)]
 #[description(
@@ -366,6 +476,8 @@ A win in a small field counts as a mark on the big field.
 You win if you have three in a row, column or diagonal in the big field."
 )]
 async fn ultimate(ctx: &Context, prompt: &Message) -> CommandResult {
+    return pvp_game(ctx, prompt, UltimateGame::new()).await;
+
     let mut players = prompt.mentions.clone();
     players.push(prompt.author.clone());
 
