@@ -14,7 +14,7 @@ use std::{collections::HashSet, env, sync::Arc};
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
-use commands::{easteregg::*, games::*, meta::*, owner::*, util::*};
+use commands::{easteregg::*, meta::*, owner::*, play::*, util::*};
 
 pub struct ShardManagerContainer;
 
