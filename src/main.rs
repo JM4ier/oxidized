@@ -35,12 +35,6 @@ impl EventHandler for Handler {
     }
 }
 
-#[hook]
-async fn pre_hook(ctx: &Context, msg: &Message, command_name: &str) -> bool {
-    msg.channel_id.say(&ctx.http, ".").await;
-    true
-}
-
 #[help]
 #[command_not_found_text = "Could not find `{}`."]
 #[max_levenshtein_distance(3)]
@@ -56,6 +50,17 @@ async fn help(
 ) -> CommandResult {
     let _ = help_commands::with_embeds(context, msg, args, help_options, groups, owners).await;
     Ok(())
+}
+
+#[hook]
+pub async fn on_dispatch_error(ctx: &Context, msg: &Message, err: DispatchError) {
+    if let DispatchError::OnlyForOwners = err {
+        let err_msg = format!(
+            "{} is not in the sudoers file.\nThis  incident will be reported.",
+            msg.author.mention()
+        );
+        let _ = msg.channel_id.say(&ctx.http, err_msg);
+    }
 }
 
 #[group]
@@ -98,7 +103,7 @@ async fn main() {
     let mut framework = StandardFramework::new()
         .help(&HELP)
         .configure(|c| c.owners(owners).prefix("="))
-        .before(pre_hook);
+        .on_dispatch_error(on_dispatch_error);
 
     for group in command_groups() {
         framework = framework.group(group);
