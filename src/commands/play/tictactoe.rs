@@ -100,6 +100,7 @@ impl PvpGame for TTTField {
             }
         };
 
+        m.content("");
         m.embed(|e| {
             let title = title.clone();
             let subtitle = subtitle.clone();
