@@ -36,8 +36,8 @@ impl EventHandler for Handler {
 }
 
 #[hook]
-async fn before(ctx: &Context, msg: &Message, command_name: &str) -> bool {
-    println!("pre-hook");
+async fn pre_hook(ctx: &Context, msg: &Message, command_name: &str) -> bool {
+    msg.channel_id.say(&ctx.http, ".").await;
     true
 }
 
@@ -97,7 +97,8 @@ async fn main() {
     // Create the framework
     let mut framework = StandardFramework::new()
         .help(&HELP)
-        .configure(|c| c.owners(owners).prefix("="));
+        .configure(|c| c.owners(owners).prefix("="))
+        .before(pre_hook);
 
     for group in command_groups() {
         framework = framework.group(group);
