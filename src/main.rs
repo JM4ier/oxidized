@@ -35,6 +35,12 @@ impl EventHandler for Handler {
     }
 }
 
+#[hook]
+async fn before(ctx: &Context, msg: &Message, command_name: &str) -> bool {
+    println!("pre-hook");
+    true
+}
+
 #[help]
 #[command_not_found_text = "Could not find `{}`."]
 #[max_levenshtein_distance(3)]
