@@ -57,6 +57,10 @@ async fn help(
 #[commands(info, ping, solution, random)]
 struct General;
 
+pub fn command_groups() -> Vec<&'static CommandGroup> {
+    vec![&GENERAL_GROUP, &MANAGEMENT_GROUP, &GAMES_GROUP]
+}
+
 #[tokio::main]
 async fn main() {
     // Initialize the logger to use environment variables.
@@ -85,12 +89,13 @@ async fn main() {
     };
 
     // Create the framework
-    let framework = StandardFramework::new()
+    let mut framework = StandardFramework::new()
         .help(&HELP)
-        .configure(|c| c.owners(owners).prefix("="))
-        .group(&GENERAL_GROUP)
-        .group(&GAMES_GROUP)
-        .group(&MANAGEMENT_GROUP);
+        .configure(|c| c.owners(owners).prefix("="));
+
+    for group in command_groups() {
+        framework = framework.group(group);
+    }
 
     let mut client = Client::builder(&token)
         .framework(framework)
