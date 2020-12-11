@@ -59,7 +59,7 @@ pub async fn on_dispatch_error(ctx: &Context, msg: &Message, err: DispatchError)
             "{} is not in the sudoers file.\nThis incident will be reported.",
             msg.author.mention()
         );
-        let _ = msg.channel_id.say(&ctx.http, err_msg);
+        let _ = msg.channel_id.say(&ctx.http, err_msg).await;
     }
     println!("{:?}", err);
 }
