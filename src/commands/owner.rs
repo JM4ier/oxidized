@@ -1,11 +1,23 @@
 use crate::prelude::*;
 use crate::ShardManagerContainer;
-use serenity::framework::standard::{macros::command, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
+use serenity::{
+    framework::standard::{
+        macros::{command, *},
+        *,
+    },
+    futures::*,
+    model::prelude::*,
+    prelude::*,
+};
+
+#[group]
+#[owners_only]
+#[prefix = "sudo"]
+#[commands(quit, repeat, delete)]
+pub struct Management;
 
 #[command]
-#[owners_only]
+#[aliases(restart)]
 async fn quit(ctx: &Context, msg: &Message) -> CommandResult {
     let data = ctx.data.read().await;
 
@@ -23,7 +35,6 @@ async fn quit(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
-#[owners_only]
 async fn repeat(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let count = args.single::<u32>()?;
@@ -31,5 +42,25 @@ async fn repeat(ctx: &Context, msg: &Message) -> CommandResult {
     for _ in 0..count {
         msg.channel_id.say(&ctx.http, &word).await?;
     }
+    Ok(())
+}
+
+#[command]
+async fn delete(ctx: &Context, msg: &Message) -> CommandResult {
+    let mut delete_count = msg.args().single::<i64>().unwrap_or(100);
+    let mut messages = msg.channel_id.messages_iter(&ctx).boxed();
+    while let Some(message_res) = messages.next().await {
+        if let Ok(msg) = message_res {
+            if msg.is_own(&ctx.cache).await {
+                let _ = msg.delete(&ctx.http).await;
+            }
+        }
+
+        delete_count -= 1;
+        if delete_count <= 0 {
+            break;
+        }
+    }
+
     Ok(())
 }

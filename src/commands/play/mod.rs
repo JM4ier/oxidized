@@ -10,7 +10,7 @@ mod ultimate;
 #[group]
 #[prefix = "play"]
 #[commands(tictactoe, ultimate)]
-pub struct PlayGroup;
+pub struct Games;
 
 #[command]
 #[only_in(guilds)]

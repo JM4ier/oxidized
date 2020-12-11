@@ -54,8 +54,8 @@ async fn help(
 
 #[group]
 #[help_available]
-#[commands(info, ping, quit, solution, random, elthision, repeat)]
-#[sub_groups(PlayGroup)]
+#[commands(info, ping, solution, random)]
+#[sub_groups(Games, Management)]
 struct General;
 
 #[tokio::main]
