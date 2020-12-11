@@ -1,11 +1,16 @@
 use crate::tryc;
 use serenity::builder::*;
-use serenity::framework::standard::{macros::command, CommandResult};
+use serenity::framework::standard::{macros::command, macros::*, CommandResult};
 use serenity::model::{channel::*, user::*};
 use serenity::prelude::*;
 
 mod tictactoe;
 mod ultimate;
+
+#[group]
+#[prefix = "play"]
+#[commands(tictactoe, ultimate)]
+pub struct PlayGroup;
 
 #[command]
 #[only_in(guilds)]
