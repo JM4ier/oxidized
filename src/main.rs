@@ -61,7 +61,6 @@ pub async fn on_dispatch_error(ctx: &Context, msg: &Message, err: DispatchError)
         );
         let _ = msg.channel_id.say(&ctx.http, err_msg).await;
     }
-    println!("{:?}", err);
 }
 
 #[group]
