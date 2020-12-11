@@ -8,6 +8,7 @@ mod tictactoe;
 mod ultimate;
 
 #[group]
+#[help_available]
 #[prefix = "play"]
 #[commands(tictactoe, ultimate)]
 pub struct Games;

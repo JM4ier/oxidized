@@ -55,7 +55,6 @@ async fn help(
 #[group]
 #[help_available]
 #[commands(info, ping, solution, random)]
-#[sub_groups(Games, Management)]
 struct General;
 
 #[tokio::main]
@@ -89,7 +88,9 @@ async fn main() {
     let framework = StandardFramework::new()
         .help(&HELP)
         .configure(|c| c.owners(owners).prefix("="))
-        .group(&GENERAL_GROUP);
+        .group(&GENERAL_GROUP)
+        .group(&GAMES_GROUP)
+        .group(&MANAGEMENT_GROUP);
 
     let mut client = Client::builder(&token)
         .framework(framework)
