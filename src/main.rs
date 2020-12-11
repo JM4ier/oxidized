@@ -56,7 +56,7 @@ async fn help(
 pub async fn on_dispatch_error(ctx: &Context, msg: &Message, err: DispatchError) {
     if let DispatchError::OnlyForOwners = err {
         let err_msg = format!(
-            "{} is not in the sudoers file.\nThis incident will be reported.",
+            "{} is not in the sudoers file. This incident will be reported.",
             msg.author.mention()
         );
         let _ = msg.channel_id.say(&ctx.http, err_msg).await;
