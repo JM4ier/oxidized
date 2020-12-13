@@ -38,7 +38,7 @@ async fn quit(ctx: &Context, msg: &Message) -> CommandResult {
 async fn repeat(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let count = args.single::<u32>()?;
-    let word = args.single::<String>()?;
+    let word = args.rest();
     for _ in 0..count {
         msg.channel_id.say(&ctx.http, &word).await?;
     }
