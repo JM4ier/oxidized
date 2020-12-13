@@ -32,11 +32,18 @@ async fn info(ctx: &Context, msg: &Message) -> CommandResult {
                 e.description("All the info you could want");
                 e.field(
                     "Author",
-                    format!(" {} | <https://github.com/JM4ier>", DISCORD_AUTHOR),
+                    format!(
+                        " {} | [GitHub Profile](https://github.com/JM4ier)",
+                        DISCORD_AUTHOR
+                    ),
                     false,
                 );
                 e.field("Version", format!("{} v{}", NAME, VERSION), false);
-                e.field("Source", "<https://github.com/JM4ier/oxidized>", false);
+                e.field(
+                    "Source",
+                    "[GitHub](https://github.com/JM4ier/oxidized)",
+                    false,
+                );
                 e.field("Build", format!("`{}`", BUILD_DATE), false)
             })
         })
