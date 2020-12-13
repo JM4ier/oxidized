@@ -36,7 +36,8 @@ async fn info(ctx: &Context, msg: &Message) -> CommandResult {
                     false,
                 );
                 e.field("Version", format!("{} v{}", NAME, VERSION), false);
-                e.field("Source", "<https://github.com/JM4ier/oxidized>", false)
+                e.field("Source", "<https://github.com/JM4ier/oxidized>", false);
+                e.field("Build", format!("`{}`", BUILD_DATE), false)
             })
         })
         .await?;
