@@ -41,7 +41,7 @@ async fn info(ctx: &Context, msg: &Message) -> CommandResult {
                 e.field("Version", format!("{} v{}", NAME, VERSION), false);
                 e.field(
                     "Source",
-                    "[GitHub](https://github.com/JM4ier/oxidized)",
+                    "[GitHub Repository](https://github.com/JM4ier/oxidized)",
                     false,
                 );
                 e.field("Build", format!("`{}`", BUILD_DATE), false)

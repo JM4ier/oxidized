@@ -8,7 +8,7 @@ use serenity::{
     client::bridge::gateway::ShardManager,
     framework::{standard::macros::*, standard::*, StandardFramework},
     http::Http,
-    model::{channel::*, event::ResumedEvent, gateway::Ready, id::*},
+    model::{channel::*, event::ResumedEvent, gateway::*, id::*},
     prelude::*,
 };
 use std::{collections::HashSet, env, sync::Arc};
@@ -25,8 +25,9 @@ struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, _: Context, ready: Ready) {
+    async fn ready(&self, ctx: Context, ready: Ready) {
         info!("Connected as {}", ready.user.name);
+        ctx.shard.set_activity(Some(Activity::listening("=help")));
     }
 
     async fn resume(&self, _: Context, _: ResumedEvent) {
@@ -132,4 +133,3 @@ async fn main() {
         error!("Client error: {:?}", why);
     }
 }
-
