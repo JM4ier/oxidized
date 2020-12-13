@@ -1,6 +1,8 @@
 mod commands;
 mod prelude;
 
+use commands::{easteregg::*, meta::*, owner::*, play::*, util::*};
+use prelude::*;
 use serenity::{
     async_trait,
     client::bridge::gateway::ShardManager,
@@ -10,11 +12,8 @@ use serenity::{
     prelude::*,
 };
 use std::{collections::HashSet, env, sync::Arc};
-
 use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
-
-use commands::{easteregg::*, meta::*, owner::*, play::*, util::*};
 
 pub struct ShardManagerContainer;
 
@@ -102,7 +101,7 @@ async fn main() {
     // Create the framework
     let mut framework = StandardFramework::new()
         .help(&HELP)
-        .configure(|c| c.owners(owners).prefix("="))
+        .configure(|c| c.owners(owners).prefix(PREFIX))
         .on_dispatch_error(on_dispatch_error);
 
     for group in command_groups() {
@@ -133,4 +132,3 @@ async fn main() {
         error!("Client error: {:?}", why);
     }
 }
-

@@ -8,6 +8,7 @@ pub const NAME: &'static str = env!("CARGO_PKG_NAME");
 pub const AUTHORS: &'static str = env!("CARGO_PKG_AUTHORS");
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 pub const DISCORD_AUTHOR: &'static str = "<@!177498563637542921>";
+pub const PREFIX: &'static str = "=";
 
 fn commands() -> Vec<&'static str> {
     let mut groups = VecDeque::from(command_groups());
@@ -33,9 +34,13 @@ impl MessageArgs for Message {
     fn args(&self) -> Args {
         let delimiter = [Delimiter::Single(' ')];
 
-        let mut args = Args::new(&self.content, &delimiter);
+        // remove leading prefix
+        let content = self.content.split(PREFIX).collect::<String>();
+
+        let mut args = Args::new(&content, &delimiter);
         let cmds = commands();
 
+        // remove all group prefixes to find command
         loop {
             match args.single::<String>() {
                 Ok(arg) => {
