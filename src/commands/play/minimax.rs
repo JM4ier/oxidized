@@ -30,7 +30,7 @@ fn minimax<G: PvpGame + Clone, M: MinimaxAi<G>>(
             let mut eboard = board.clone();
             let status = eboard.make_move(mov, player);
             if status != GameState::Invalid {
-                let score = 1.0 - minimax(mm, &eboard, player, depth - 1).0;
+                let score = 1.0 - minimax(mm, &eboard, 1 - player, depth - 1).0;
                 if score > max {
                     max = score;
                     best_move = mov;
