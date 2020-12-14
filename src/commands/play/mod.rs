@@ -4,8 +4,10 @@ use serenity::framework::standard::{macros::command, macros::*, CommandResult};
 use serenity::model::{channel::*, user::*};
 use serenity::prelude::*;
 
+mod minimax;
 mod tictactoe;
 mod ultimate;
+use minimax::MinimaxAi;
 
 #[group]
 #[help_available]
@@ -33,7 +35,7 @@ async fn ultimate(ctx: &Context, prompt: &Message) -> CommandResult {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum GameState {
+pub enum GameState {
     Running,
     Tie,
     Invalid,
@@ -51,7 +53,7 @@ impl GameState {
 }
 
 /// All functions a game must possess
-trait PvpGame {
+pub trait PvpGame {
     /// All possible reactions to this game
     fn reactions() -> Vec<ReactionType>;
     /// Display the current board in the discord message
@@ -73,11 +75,11 @@ trait PvpGame {
     }
 }
 
-trait AiPlayer<G: PvpGame> {
+pub trait AiPlayer<G: PvpGame> {
     fn make_move(&self, game: &G, player_id: usize) -> usize;
 }
 
-struct GameContext {
+pub struct GameContext {
     players: Vec<User>,
     shapes: Vec<char>,
     turn: usize,
