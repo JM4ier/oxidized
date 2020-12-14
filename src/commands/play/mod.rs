@@ -1,4 +1,4 @@
-use crate::tryc;
+use crate::{prelude::*, tryc};
 use serenity::builder::*;
 use serenity::framework::standard::{macros::command, macros::*, CommandResult};
 use serenity::model::{channel::*, user::*};
@@ -68,6 +68,13 @@ trait PvpGame {
             None
         }
     }
+    fn ai() -> Option<Box<dyn AiPlayer<Self>>> {
+        None
+    }
+}
+
+trait AiPlayer<G: PvpGame> {
+    fn make_move(&self, game: &G, player_id: usize) -> usize;
 }
 
 struct GameContext {
@@ -95,6 +102,20 @@ async fn pvp_game<G: PvpGame>(ctx: &Context, prompt: &Message, mut game: G) -> C
         return Ok(());
     }
 
+    // check if the player wants to play against AI
+    let mut ai_player_id = None;
+    for (i, player) in players.iter().enumerate() {
+        if player.id == ctx.cache.current_user().await.id {
+            ai_player_id = Some(i);
+        }
+    }
+    if ai_player_id.is_some() && G::ai().is_none() {
+        prompt
+            .reply(&ctx.http, "This Game doesn't support AI players.")
+            .await?;
+        return Ok(());
+    }
+
     // create message and react
     let mut message = prompt.channel_id.say(&ctx.http, "Loading Game...").await?;
     for r in G::reactions() {
@@ -113,21 +134,37 @@ async fn pvp_game<G: PvpGame>(ctx: &Context, prompt: &Message, mut game: G) -> C
             .await?;
 
         let play = loop {
-            let reaction = message.await_reaction(&ctx.shard).await;
-            let reaction = tryc!(reaction);
-            let reaction = reaction.as_inner_ref();
+            let is_ai_move = Some(game_ctx.turn) == ai_player_id;
 
-            // check player who has reacted
-            if Some(game_ctx.players[game_ctx.turn].id) != reaction.user_id {
-                continue;
-            }
+            let idx = if is_ai_move {
+                G::ai().unwrap().make_move(&game, ai_player_id.unwrap())
+            } else {
+                let reaction = message.await_reaction(&ctx.shard).await;
+                let reaction = tryc!(reaction);
+                let reaction = reaction.as_inner_ref();
 
-            // if it is one of the given emojis, try to make that move
-            let idx = tryc!(G::reactions().into_iter().position(|e| e == reaction.emoji));
+                // check player who has reacted
+                if Some(game_ctx.players[game_ctx.turn].id) != reaction.user_id {
+                    continue;
+                }
+
+                // if it is one of the given emojis, try to make that move
+                tryc!(G::reactions().into_iter().position(|e| e == reaction.emoji))
+            };
 
             let state = game.make_move(idx, game_ctx.turn);
             if state != GameState::Invalid {
                 break state;
+            }
+
+            // ai made an invalid move
+            if is_ai_move {
+                let reply = format!(
+                    "The AI for this game sucks and tries to do invalid moves, {} pls fix.",
+                    DISCORD_AUTHOR
+                );
+                message.reply(&ctx.http, reply).await?;
+                return Ok(());
             }
         };
 
