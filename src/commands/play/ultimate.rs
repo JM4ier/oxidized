@@ -1,12 +1,16 @@
 use super::tictactoe::*;
 use super::*;
 
+#[derive(Clone, PartialEq, Eq, Default)]
 pub struct UltimateGame {
     field: [TTTField; 9],
     cell: usize,
 }
 
 impl PvpGame for UltimateGame {
+    fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
     fn status(&self) -> GameState {
         let mut wins = [None; 9];
         for i in 0..9 {

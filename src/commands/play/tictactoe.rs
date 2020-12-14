@@ -47,6 +47,9 @@ impl Draw for TTTField {
 }
 
 impl PvpGame for TTTField {
+    fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
     fn status(&self) -> GameState {
         let mut win_combos = vec![[0, 4, 8], [2, 4, 6]];
         for i in 0..3 {
@@ -123,6 +126,9 @@ struct TTTAI;
 impl MinimaxAi<TTTField> for TTTAI {
     fn rate(&self, _: &TTTField, _: usize) -> f64 {
         0.0
+    }
+    fn default_move(&self) -> usize {
+        0
     }
     fn depth(&self) -> usize {
         9

@@ -3,6 +3,7 @@ use super::*;
 pub trait MinimaxAi<G: PvpGame + Clone> {
     fn rate(&self, board: &G, player: usize) -> f64;
     fn depth(&self) -> usize;
+    fn default_move(&self) -> usize;
 }
 
 fn minimax<G: PvpGame + Clone, M: MinimaxAi<G>>(
@@ -43,6 +44,10 @@ fn minimax<G: PvpGame + Clone, M: MinimaxAi<G>>(
 
 impl<G: PvpGame + Clone, M: MinimaxAi<G>> AiPlayer<G> for M {
     fn make_move(&self, board: &G, id: usize) -> usize {
-        minimax(self, board, id, self.depth() + 1).1
+        if board.is_empty() {
+            self.default_move()
+        } else {
+            minimax(self, board, id, self.depth() + 1).1
+        }
     }
 }

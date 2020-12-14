@@ -73,6 +73,7 @@ pub trait PvpGame {
     fn ai() -> Option<Box<dyn AiPlayer<Self>>> {
         None
     }
+    fn is_empty(&self) -> bool;
 }
 
 pub trait AiPlayer<G: PvpGame> {
