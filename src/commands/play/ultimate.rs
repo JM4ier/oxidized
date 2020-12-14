@@ -101,6 +101,9 @@ impl UltimateGame {
                 let xf = 2 + 19 * x;
                 let yf = 1 + 10 * y;
 
+                // draw number of field in top left corner
+                field[yf - 1][xf - 1] = numbers[flatten_xy(x, y)];
+
                 let status = self.field[flatten_xy(x, y)].status();
                 if status.is_finished() {
                     if let GameState::Win(winner) = status {
@@ -149,8 +152,6 @@ impl UltimateGame {
                         }
                     }
                 }
-
-                field[yf - 1][xf - 1] = numbers[flatten_xy(x, y)];
 
                 // draw selection
                 if self.cell == flatten_xy(x, y) {
