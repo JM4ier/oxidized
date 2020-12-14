@@ -195,7 +195,7 @@ impl MinimaxAi<UltimateGame> for UltimateMMAI {
         sum
     }
     fn depth(&self) -> usize {
-        2
+        0
     }
     fn default_move(&self) -> usize {
         0
