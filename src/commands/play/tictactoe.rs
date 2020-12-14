@@ -121,7 +121,7 @@ impl PvpGame for TTTField {
     }
 }
 
-struct TTTAI;
+pub struct TTTAI;
 
 impl MinimaxAi<TTTField> for TTTAI {
     fn rate(&self, _: &TTTField, _: usize) -> f64 {

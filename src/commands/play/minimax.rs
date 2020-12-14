@@ -6,13 +6,15 @@ pub trait MinimaxAi<G: PvpGame + Clone> {
     fn default_move(&self) -> usize;
 }
 
-fn minimax<G: PvpGame + Clone, M: MinimaxAi<G>>(
+pub fn minimax<G: PvpGame + Clone, M: MinimaxAi<G>>(
     mm: &M,
     board: &G,
     player: usize,
     depth: usize,
 ) -> (f64, usize) {
-    if let GameState::Win(winner) = board.status() {
+    if board.is_empty() {
+        (0.5, mm.default_move())
+    } else if let GameState::Win(winner) = board.status() {
         if winner == player {
             (1.0, 0)
         } else {
@@ -44,10 +46,6 @@ fn minimax<G: PvpGame + Clone, M: MinimaxAi<G>>(
 
 impl<G: PvpGame + Clone, M: MinimaxAi<G>> AiPlayer<G> for M {
     fn make_move(&self, board: &G, id: usize) -> usize {
-        if board.is_empty() {
-            self.default_move()
-        } else {
-            minimax(self, board, id, self.depth() + 1).1
-        }
+        minimax(self, board, id, self.depth() + 1).1
     }
 }

@@ -8,6 +8,9 @@ pub struct UltimateGame {
 }
 
 impl PvpGame for UltimateGame {
+    fn ai() -> Option<Box<dyn AiPlayer<Self>>> {
+        Some(Box::new(UltimateMMAI))
+    }
     fn is_empty(&self) -> bool {
         *self == Self::default()
     }
@@ -177,5 +180,24 @@ impl UltimateGame {
             .into_iter()
             .map(|line| format!("{}\n", line.iter().collect::<String>()))
             .fold(String::new(), |a, b| a + &b)
+    }
+}
+
+pub struct UltimateMMAI;
+
+impl MinimaxAi<UltimateGame> for UltimateMMAI {
+    fn rate(&self, board: &UltimateGame, id: usize) -> f64 {
+        let mut sum = 0.0;
+        for field in board.field.iter() {
+            sum += super::minimax::minimax(&TTTAI, field, id, 9).0;
+            sum += 1.0 - super::minimax::minimax(&TTTAI, field, 1 - id, 9).0;
+        }
+        sum
+    }
+    fn depth(&self) -> usize {
+        2
+    }
+    fn default_move(&self) -> usize {
+        0
     }
 }
