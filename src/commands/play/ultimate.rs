@@ -97,8 +97,27 @@ impl UltimateGame {
         // draw small fields
         for x in 0..3 {
             for y in 0..3 {
+                // x,y offset
                 let xf = 2 + 19 * x;
                 let yf = 1 + 10 * y;
+
+                let status = self.field[flatten_xy(x, y)].status();
+                if status.is_finished() {
+                    if let GameState::Win(winner) = status {
+                        for x in xf..=(xf + 12) {
+                            for y in yf..=(yf + 6) {
+                                field[y][x] = symbols[winner];
+                            }
+                        }
+                    } else {
+                        let midy = yf + 3;
+                        let midx = xf + 5;
+                        field[midy][midx + 0] = 'T';
+                        field[midy][midx + 1] = 'I';
+                        field[midy][midx + 2] = 'E';
+                    }
+                    continue;
+                }
 
                 // vertical lines
                 for x in 0..2 {
