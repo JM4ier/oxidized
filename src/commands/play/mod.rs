@@ -109,9 +109,11 @@ async fn pvp_game<G: PvpGame>(ctx: &Context, prompt: &Message, mut game: G) -> C
             ai_player_id = Some(i);
         }
     }
+
+    // check if the game even supports AI
     if ai_player_id.is_some() && G::ai().is_none() {
         prompt
-            .reply(&ctx.http, "This Game doesn't support AI players.")
+            .reply(&ctx.http, "This game doesn't support AI players.")
             .await?;
         return Ok(());
     }

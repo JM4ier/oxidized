@@ -113,6 +113,54 @@ impl PvpGame for TTTField {
             e
         })
     }
+    fn ai() -> Option<Box<dyn AiPlayer<Self>>> {
+        Some(Box::new(TTTAI))
+    }
+}
+
+struct TTTAI;
+
+fn score(field: &TTTField, player: usize) -> f64 {
+    if let GameState::Win(winner) = field.status() {
+        if winner == player {
+            1.0
+        } else {
+            0.0
+        }
+    } else if GameState::Tie == field.status() {
+        0.5
+    } else {
+        let mut efield = field.clone();
+        let mut max = 0.0_f64;
+        for tile in 0..9 {
+            if field[tile].is_none() {
+                efield[tile] = Some(player);
+                max = max.max(1.0 - score(&efield, 1 - player));
+                efield[tile] = None;
+            }
+        }
+        max
+    }
+}
+
+impl AiPlayer<TTTField> for TTTAI {
+    fn make_move(&self, field: &TTTField, id: usize) -> usize {
+        assert!(!field.status().is_finished());
+        let mut min = 1.0;
+        let mut idx = 0;
+        for i in 0..9 {
+            if field[i].is_none() {
+                let mut efield = *field;
+                efield[i] = Some(id);
+                let score = score(&efield, 1 - id);
+                if score < min {
+                    min = score;
+                    idx = i;
+                }
+            }
+        }
+        idx
+    }
 }
 
 pub fn flatten_xy(x: usize, y: usize) -> usize {
