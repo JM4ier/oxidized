@@ -1,6 +1,8 @@
 use super::tictactoe::*;
 use super::*;
 
+mod ai;
+
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct UltimateGame {
     field: [TTTField; 9],
@@ -9,7 +11,7 @@ pub struct UltimateGame {
 
 impl PvpGame for UltimateGame {
     fn ai() -> Option<Box<dyn AiPlayer<Self>>> {
-        Some(Box::new(UltimateMMAI))
+        Some(Box::new(ai::GenAi))
     }
     fn is_empty(&self) -> bool {
         *self == Self::default()
@@ -190,7 +192,6 @@ impl MinimaxAi<UltimateGame> for UltimateMMAI {
         let mut sum = 0.0;
         for field in board.field.iter() {
             sum += super::minimax::minimax(&TTTAI, field, id, 9).0;
-            sum += 1.0 - super::minimax::minimax(&TTTAI, field, 1 - id, 9).0;
         }
         sum
     }
