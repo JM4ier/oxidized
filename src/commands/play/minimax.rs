@@ -44,8 +44,10 @@ pub fn minimax<G: PvpGame + Clone, M: MinimaxAi<G>>(
     }
 }
 
-impl<G: PvpGame + Clone, M: MinimaxAi<G>> AiPlayer<G> for M {
-    fn make_move(&self, board: &G, id: usize) -> usize {
-        minimax(self, board, id, self.depth() + 1).1
+pub struct Minimax<M>(pub M);
+
+impl<G: PvpGame + Clone, M: MinimaxAi<G>> AiPlayer<G> for Minimax<M> {
+    fn make_move(&mut self, board: &G, id: usize) -> usize {
+        minimax(&self.0, board, id, self.0.depth() + 1).1
     }
 }

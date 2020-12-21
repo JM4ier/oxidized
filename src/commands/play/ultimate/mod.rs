@@ -11,7 +11,7 @@ pub struct UltimateGame {
 
 impl PvpGame for UltimateGame {
     fn ai() -> Option<Box<dyn AiPlayer<Self>>> {
-        Some(Box::new(ai::GenAi))
+        Some(Box::new(TreeSearchAi::<Self>::new(0.5)))
     }
     fn is_empty(&self) -> bool {
         *self == Self::default()

@@ -4,10 +4,12 @@ use serenity::framework::standard::{macros::command, macros::*, CommandResult};
 use serenity::model::{channel::*, user::*};
 use serenity::prelude::*;
 
+mod mcts;
 mod minimax;
 mod tictactoe;
 mod ultimate;
-use minimax::MinimaxAi;
+use mcts::*;
+use minimax::*;
 
 #[group]
 #[help_available]
@@ -77,7 +79,7 @@ pub trait PvpGame {
 }
 
 pub trait AiPlayer<G: PvpGame> {
-    fn make_move(&self, game: &G, player_id: usize) -> usize;
+    fn make_move(&mut self, game: &G, player_id: usize) -> usize;
 }
 
 pub struct GameContext {

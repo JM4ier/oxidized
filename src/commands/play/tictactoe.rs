@@ -117,7 +117,7 @@ impl PvpGame for TTTField {
         })
     }
     fn ai() -> Option<Box<dyn AiPlayer<Self>>> {
-        Some(Box::new(TTTAI))
+        Some(Box::new(Minimax(TTTAI)))
     }
 }
 

@@ -4,7 +4,7 @@ use rand::prelude::*;
 pub struct GenAi;
 
 impl AiPlayer<UltimateGame> for GenAi {
-    fn make_move(&self, game: &UltimateGame, player_id: usize) -> usize {
+    fn make_move(&mut self, game: &UltimateGame, player_id: usize) -> usize {
         let round_rand = 0.0;
         let mut rng = thread_rng();
 
