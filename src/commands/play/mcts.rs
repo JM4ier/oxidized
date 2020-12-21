@@ -148,25 +148,32 @@ impl<T> TreeSearchAi<T> {
 
 fn roll_out<G: PvpGame + Clone>(rng: &mut ThreadRng, game: &G, player: usize) -> Stat {
     let mut stat = Stat::default();
-    let moves = G::reactions().len();
+    let mut moves = (0..G::reactions().len()).collect::<Vec<_>>();
     for _ in 0..ROLLOUT_REPS {
         let mut game = game.clone();
         let mut active_player = player;
-        loop {
-            match game.make_move(rng.gen::<usize>() % moves, active_player) {
-                GameState::Win(p) => {
-                    stat.win += (p == player) as usize;
-                    stat.loss += (p != player) as usize;
-                    break;
+
+        'game: loop {
+            moves.shuffle(rng);
+            for &m in moves.iter() {
+                match game.make_move(m, active_player) {
+                    GameState::Win(p) => {
+                        stat.win += (p == player) as usize;
+                        stat.loss += (p != player) as usize;
+                        break 'game;
+                    }
+                    GameState::Tie => {
+                        stat.tie += 1;
+                        break 'game;
+                    }
+                    GameState::Running => {
+                        active_player = 1 - active_player;
+                        continue 'game;
+                    }
+                    GameState::Invalid => {}
                 }
-                GameState::Tie => {
-                    stat.tie += 1;
-                    break;
-                }
-                GameState::Running => {
-                    active_player = 1 - active_player;
-                }
-                GameState::Invalid => {}
+                // this shouldn't happen, but might anyways
+                return stat;
             }
         }
     }
