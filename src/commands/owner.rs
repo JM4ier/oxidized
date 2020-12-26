@@ -15,7 +15,7 @@ use tracing::*;
 #[group]
 #[owners_only]
 #[prefix = "sudo"]
-#[commands(quit, repeat, delete, debug)]
+#[commands(quit, repeat, delete, debug, status)]
 pub struct Management;
 
 #[command]
