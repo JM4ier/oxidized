@@ -10,10 +10,12 @@ use serenity::{
     prelude::*,
 };
 
+use tracing::*;
+
 #[group]
 #[owners_only]
 #[prefix = "sudo"]
-#[commands(quit, repeat, delete)]
+#[commands(quit, repeat, delete, debug)]
 pub struct Management;
 
 #[command]
@@ -62,5 +64,11 @@ async fn delete(ctx: &Context, msg: &Message) -> CommandResult {
         }
     }
 
+    Ok(())
+}
+
+#[command]
+async fn debug(ctx: &Context, msg: &Message) -> CommandResult {
+    event!(tracing::Level::INFO, "{}", msg.content);
     Ok(())
 }
