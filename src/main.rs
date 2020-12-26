@@ -63,6 +63,15 @@ pub async fn on_dispatch_error(ctx: &Context, msg: &Message, err: DispatchError)
     }
 }
 
+#[hook]
+pub async fn after(ctx: &Context, msg: &Message, _: &str, err: Result<(), CommandError>) {
+    if let Err(_) = err {
+        let _ = msg
+            .react(ctx, ReactionType::Unicode(String::from("🤦")))
+            .await;
+    }
+}
+
 #[group]
 #[help_available]
 #[commands(info, ping, solution, random)]
@@ -103,7 +112,8 @@ async fn main() {
     let mut framework = StandardFramework::new()
         .help(&HELP)
         .configure(|c| c.owners(owners).prefix(PREFIX))
-        .on_dispatch_error(on_dispatch_error);
+        .on_dispatch_error(on_dispatch_error)
+        .after(after);
 
     for group in command_groups() {
         framework = framework.group(group);

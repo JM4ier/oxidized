@@ -68,7 +68,7 @@ async fn delete(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
-async fn debug(ctx: &Context, msg: &Message) -> CommandResult {
+async fn debug(_: &Context, msg: &Message) -> CommandResult {
     event!(tracing::Level::INFO, "{}", msg.content);
     Ok(())
 }
