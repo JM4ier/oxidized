@@ -72,3 +72,17 @@ async fn debug(_: &Context, msg: &Message) -> CommandResult {
     event!(tracing::Level::INFO, "{}", msg.content);
     Ok(())
 }
+
+#[command]
+async fn status(ctx: &Context, msg: &Message) -> CommandResult {
+    let mut args = msg.args();
+    let activity = match args.single::<String>()?.as_str() {
+        "playing" => Activity::playing(args.rest()),
+        "listening" => Activity::listening(args.rest()),
+        "competing" => Activity::competing(args.rest()),
+        "streaming" => Activity::streaming(args.rest(), "https://youtu.be/dQw4w9WgXcQ"),
+        _ => return Err(std::convert::From::from("invalid activity type")),
+    };
+    ctx.shard.set_activity(Some(activity));
+    Ok(())
+}
