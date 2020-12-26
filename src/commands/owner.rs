@@ -80,7 +80,9 @@ async fn status(ctx: &Context, msg: &Message) -> CommandResult {
         "playing" => Activity::playing(args.rest()),
         "listening" => Activity::listening(args.rest()),
         "competing" => Activity::competing(args.rest()),
-        "streaming" => Activity::streaming(args.rest(), "https://youtu.be/dQw4w9WgXcQ"),
+        "streaming" => {
+            Activity::streaming(args.rest(), "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        }
         _ => return Err(std::convert::From::from("invalid activity type")),
     };
     ctx.shard.set_activity(Some(activity));
