@@ -81,7 +81,8 @@ async fn status(ctx: &Context, msg: &Message) -> CommandResult {
         "listening" => Activity::listening(args.rest()),
         "competing" => Activity::competing(args.rest()),
         "streaming" => {
-            Activity::streaming(args.rest(), "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+            let url = args.single::<String>()?;
+            Activity::streaming(args.rest(), &url)
         }
         _ => return Err(std::convert::From::from("invalid activity type")),
     };
