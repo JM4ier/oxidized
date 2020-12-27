@@ -1,5 +1,6 @@
 #![allow(unused)]
 use super::command_groups;
+use rusqlite::{params, Connection};
 use serenity::framework::standard::*;
 use serenity::model::prelude::*;
 use std::collections::*;
@@ -71,4 +72,8 @@ macro_rules! tryc {
             continue;
         }
     };
+}
+
+pub fn db() -> rusqlite::Result<Connection> {
+    Connection::open("./oxidized.db")
 }

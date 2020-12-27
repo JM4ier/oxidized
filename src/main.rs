@@ -69,11 +69,16 @@ pub async fn after(ctx: &Context, msg: &Message, _: &str, err: Result<(), Comman
 
 #[group]
 #[help_available]
-#[commands(info, ping, solution, random, brainfuck)]
+#[commands(info, ping, solution, random)]
 struct General;
 
 pub fn command_groups() -> Vec<&'static CommandGroup> {
-    vec![&GENERAL_GROUP, &MANAGEMENT_GROUP, &GAMES_GROUP]
+    vec![
+        &GENERAL_GROUP,
+        &MANAGEMENT_GROUP,
+        &GAMES_GROUP,
+        &BRAINFUCK_GROUP,
+    ]
 }
 
 #[tokio::main]

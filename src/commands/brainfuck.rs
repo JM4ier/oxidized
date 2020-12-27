@@ -1,7 +1,10 @@
 use crate::prelude::*;
-use serenity::framework::standard::{macros::command, CommandResult};
-use serenity::model::channel::*;
-use serenity::prelude::*;
+use rusqlite::{params, Result};
+use serenity::{
+    framework::standard::{macros::*, *},
+    model::prelude::*,
+    prelude::*,
+};
 use std::collections::*;
 use std::time::*;
 
@@ -9,7 +12,6 @@ use std::time::*;
 enum ExitCode {
     Success,
     Timeout,
-    Kill,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -24,6 +26,10 @@ enum Instr {
     JumpLeft(usize),
     Terminate,
 }
+
+#[group]
+#[commands(brainfuck, store, load)]
+pub struct Brainfuck;
 
 #[command]
 async fn brainfuck(ctx: &Context, msg: &Message) -> CommandResult {
@@ -137,4 +143,71 @@ fn execute(
         instr_ptr += 1;
     }
     (output, ExitCode::Timeout)
+}
+
+fn create_table() -> Result<()> {
+    db()?.execute(
+        "CREATE TABLE IF NOT EXISTS brainfuck (author TEXT, name TEXT, program TEXT);",
+        params!(),
+    )?;
+    Ok(())
+}
+
+#[command]
+#[min_args(2)]
+#[max_args(2)]
+pub async fn store(_: &Context, msg: &Message) -> CommandResult {
+    let mut args = msg.args();
+    let name = args.single::<String>()?;
+    let program = args.single::<String>()?;
+
+    if name.as_str().chars().any(|ch| !ch.is_ascii_alphabetic()) {
+        Err("Invalid program name")?;
+    }
+    if program.as_str().chars().any(|ch| !",.<>+-[]".contains(ch)) {
+        Err("Invalid program")?;
+    }
+
+    let author = format!("{}", msg.author.id);
+
+    create_table()?;
+    let db = db()?;
+
+    let affected = db.execute(
+        "UPDATE brainfuck SET program = ?3 WHERE author=?1 AND name = ?2;",
+        params!(author, name, program),
+    )?;
+
+    if affected == 0 {
+        db.execute(
+            "INSERT INTO brainfuck (author, name, program) VALUES (?1, ?2, ?3)",
+            params!(author, name, program),
+        )?;
+    }
+
+    Ok(())
+}
+
+#[command]
+#[min_args(1)]
+#[max_args(1)]
+pub async fn load(ctx: &Context, msg: &Message) -> CommandResult {
+    let mut args = msg.args();
+    let name = args.single::<String>()?;
+    let author = format!("{}", msg.author.id);
+    if name.as_str().chars().any(|ch| !ch.is_ascii_alphabetic()) {
+        Err("Invalid program name")?;
+    }
+
+    create_table()?;
+    let db = db()?;
+    let program: String = db.query_row(
+        "SELECT program FROM brainfuck WHERE author = ?1 AND name = ?2",
+        params!(author, name),
+        |row| row.get(0),
+    )?;
+
+    msg.reply(ctx, format!("`{}`", program)).await?;
+
+    Ok(())
 }
