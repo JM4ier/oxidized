@@ -50,7 +50,8 @@ async fn brainfuck(ctx: &Context, msg: &Message) -> CommandResult {
 fn make_program(string: &str) -> Result<Vec<Instr>, &'static str> {
     let mut program = Vec::new();
     let mut stack = VecDeque::new();
-    for (idx, ch) in string.chars().enumerate() {
+    for ch in string.chars() {
+        let idx = program.len();
         let instr = match ch {
             '>' => Instr::MoveRight,
             '<' => Instr::MoveLeft,
@@ -73,7 +74,7 @@ fn make_program(string: &str) -> Result<Vec<Instr>, &'static str> {
                 };
                 Instr::JumpLeft(target + 1)
             }
-            _ => return Err("invalid character"),
+            _ => continue,
         };
         program.push(instr);
     }
@@ -88,7 +89,7 @@ fn make_program(string: &str) -> Result<Vec<Instr>, &'static str> {
 fn execute(code: &[Instr], mut input: &[u8], time_limit: f64) -> (String, ExitCode) {
     let mut output = String::from("\u{200b}");
     let mut ptr = 0usize;
-    let mut data = vec![0u8; 1 << 16];
+    let mut data = vec![0u8; 30_000];
     let mut instr_ptr = 0;
 
     let begin = Instant::now();
