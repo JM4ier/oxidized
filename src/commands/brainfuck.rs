@@ -112,7 +112,7 @@ fn execute(
                     data[ptr] = input[0];
                     input = &input[1..];
                 } else {
-                    return (output, ExitCode::Kill);
+                    data[ptr] = 0;
                 }
             }
             Instr::Output => {
