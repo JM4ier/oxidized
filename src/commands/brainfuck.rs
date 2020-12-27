@@ -32,7 +32,7 @@ async fn brainfuck(ctx: &Context, msg: &Message) -> CommandResult {
     let program = make_program(&program)?;
     let input = args.rest().as_bytes();
 
-    let (output, exit_code) = execute(&program, input, 1.0);
+    let (output, exit_code) = execute(&program, input, 1.0, 2000);
 
     msg.channel_id
         .send_message(ctx, |m| {
@@ -86,7 +86,12 @@ fn make_program(string: &str) -> Result<Vec<Instr>, &'static str> {
     }
 }
 
-fn execute(code: &[Instr], mut input: &[u8], time_limit: f64) -> (String, ExitCode) {
+fn execute(
+    code: &[Instr],
+    mut input: &[u8],
+    time_limit: f64,
+    char_limit: usize,
+) -> (String, ExitCode) {
     let mut output = String::from("\u{200b}");
     let mut ptr = 0usize;
     let mut data = vec![0u8; 30_000];
@@ -109,7 +114,11 @@ fn execute(code: &[Instr], mut input: &[u8], time_limit: f64) -> (String, ExitCo
                     return (output, ExitCode::Kill);
                 }
             }
-            Instr::Output => output.push(data[ptr] as char),
+            Instr::Output => {
+                if output.len() < char_limit {
+                    output.push(data[ptr] as char)
+                }
+            }
             Instr::JumpRight(target) => {
                 if data[ptr] == 0 {
                     instr_ptr = target;
