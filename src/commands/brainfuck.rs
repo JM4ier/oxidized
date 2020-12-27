@@ -32,7 +32,7 @@ async fn brainfuck(ctx: &Context, msg: &Message) -> CommandResult {
     let program = make_program(&program)?;
     let input = args.rest().as_bytes();
 
-    let (output, exit_code) = execute(&program, input, 1.0, 2000);
+    let (output, exit_code) = execute(&program, input, 1.0, 1000);
 
     msg.channel_id
         .send_message(ctx, |m| {
