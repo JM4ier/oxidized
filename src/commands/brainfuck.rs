@@ -86,7 +86,7 @@ fn make_program(string: &str) -> Result<Vec<Instr>, &'static str> {
 }
 
 fn execute(code: &[Instr], mut input: &[u8], time_limit: f64) -> (String, ExitCode) {
-    let mut output = String::new();
+    let mut output = String::from("\u{200b}");
     let mut ptr = 0usize;
     let mut data = vec![0u8; 1 << 16];
     let mut instr_ptr = 0;
