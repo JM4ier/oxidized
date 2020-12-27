@@ -33,6 +33,7 @@ async fn brainfuck(ctx: &Context, msg: &Message) -> CommandResult {
     let input = args.rest().as_bytes();
 
     let (output, exit_code) = execute(&program, input, 1.0, 1000);
+    let output = String::from_utf8_lossy(&output);
 
     msg.channel_id
         .send_message(ctx, |m| {
@@ -91,8 +92,8 @@ fn execute(
     mut input: &[u8],
     time_limit: f64,
     char_limit: usize,
-) -> (String, ExitCode) {
-    let mut output = String::from("\u{200b}");
+) -> (Vec<u8>, ExitCode) {
+    let mut output = "\u{200b}".as_bytes().to_owned();
     let mut ptr = 0usize;
     let mut data = vec![0u8; 30_000];
     let mut instr_ptr = 0;
@@ -116,7 +117,7 @@ fn execute(
             }
             Instr::Output => {
                 if output.len() < char_limit {
-                    output.push(data[ptr] as char)
+                    output.push(data[ptr])
                 }
             }
             Instr::JumpRight(target) => {
