@@ -1,3 +1,4 @@
+pub mod brainfuck;
 pub mod easteregg;
 pub mod meta;
 pub mod owner;

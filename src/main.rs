@@ -1,7 +1,7 @@
 mod commands;
 mod prelude;
 
-use commands::{easteregg::*, meta::*, owner::*, play::*, util::*};
+use commands::{brainfuck::*, easteregg::*, meta::*, owner::*, play::*, util::*};
 use prelude::*;
 use serenity::{
     async_trait,
@@ -69,7 +69,7 @@ pub async fn after(ctx: &Context, msg: &Message, _: &str, err: Result<(), Comman
 
 #[group]
 #[help_available]
-#[commands(info, ping, solution, random)]
+#[commands(info, ping, solution, random, brainfuck)]
 struct General;
 
 pub fn command_groups() -> Vec<&'static CommandGroup> {
