@@ -221,12 +221,10 @@ pub async fn load(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
-#[min_args(1)]
-#[max_args(1)]
 pub async fn run(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let name = args.single::<String>()?;
     let program = load_program(name, msg)?;
     let input = args.rest();
-    make_exec(ctx, msg, &program, &input).await
+    make_exec(ctx, msg, &input, &program).await
 }
