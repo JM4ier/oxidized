@@ -28,17 +28,21 @@ enum Instr {
 }
 
 #[group]
-#[commands(brainfuck, store, load)]
+#[commands(brainfuck, store, load, run)]
 pub struct Brainfuck;
 
 #[command]
 async fn brainfuck(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let program = args.single::<String>()?;
-    let program = make_program(&program)?;
-    let input = args.rest().as_bytes();
+    let input = args.rest();
+    make_exec(ctx, msg, &input, &program).await
+}
 
-    let (output, exit_code) = execute(&program, input, 1.0, 1000);
+async fn make_exec(ctx: &Context, msg: &Message, input: &str, program: &str) -> CommandResult {
+    let program = make_program(&program)?;
+
+    let (output, exit_code) = execute(&program, input.as_bytes(), 1.0, 1000);
     let output = String::from_utf8_lossy(&output);
 
     msg.channel_id
@@ -188,12 +192,7 @@ pub async fn store(_: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-#[command]
-#[min_args(1)]
-#[max_args(1)]
-pub async fn load(ctx: &Context, msg: &Message) -> CommandResult {
-    let mut args = msg.args();
-    let name = args.single::<String>()?;
+fn load_program(name: String, msg: &Message) -> CommandResult<String> {
     let author = format!("{}", msg.author.id);
     if name.as_str().chars().any(|ch| !ch.is_ascii_alphabetic()) {
         Err("Invalid program name")?;
@@ -206,8 +205,28 @@ pub async fn load(ctx: &Context, msg: &Message) -> CommandResult {
         params!(author, name),
         |row| row.get(0),
     )?;
+    Ok(program)
+}
 
-    msg.reply(ctx, format!("`{}`", program)).await?;
-
+#[command]
+#[min_args(1)]
+#[max_args(1)]
+pub async fn load(ctx: &Context, msg: &Message) -> CommandResult {
+    let mut args = msg.args();
+    let name = args.single::<String>()?;
+    let program = load_program(name, msg)?;
+    msg.reply(ctx, format!("```brainfuck\n{}\n```", program))
+        .await?;
     Ok(())
+}
+
+#[command]
+#[min_args(1)]
+#[max_args(1)]
+pub async fn run(ctx: &Context, msg: &Message) -> CommandResult {
+    let mut args = msg.args();
+    let name = args.single::<String>()?;
+    let program = load_program(name, msg)?;
+    let input = args.rest();
+    make_exec(ctx, msg, &program, &input).await
 }
