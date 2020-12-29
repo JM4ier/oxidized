@@ -5,7 +5,6 @@ use serenity::{
         macros::{command, *},
         *,
     },
-    futures::*,
     model::prelude::*,
     prelude::*,
 };
@@ -20,6 +19,7 @@ pub struct Management;
 
 #[command]
 #[aliases(restart)]
+#[description = "Stops the bot"]
 async fn quit(ctx: &Context, msg: &Message) -> CommandResult {
     let data = ctx.data.read().await;
 
@@ -37,6 +37,8 @@ async fn quit(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
+#[min_args(2)]
+#[description = "The first argument is the number of times to repeat the rest of the message."]
 async fn repeat(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let count = args.single::<u32>()?;
@@ -48,19 +50,20 @@ async fn repeat(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
+#[description = "Deletes the bots messages. If no argument is provided, it goes through the last 100 messages and deletes the bots messages. If an argument 'x' is provided, it will go throught the last x messages of the channel."]
 async fn delete(ctx: &Context, msg: &Message) -> CommandResult {
-    let mut delete_count = msg.args().single::<i64>().unwrap_or(100);
-    let mut messages = msg.channel_id.messages_iter(&ctx).boxed();
-    while let Some(message_res) = messages.next().await {
-        if let Ok(msg) = message_res {
-            if msg.is_own(&ctx.cache).await {
-                let _ = msg.delete(&ctx.http).await;
-            }
-        }
+    let delete_count = msg.args().single::<u64>().unwrap_or(100);
+    let channel = msg.channel_id;
 
-        delete_count -= 1;
-        if delete_count <= 0 {
-            break;
+    let messages = channel
+        .messages(ctx, |retriever| {
+            retriever.before(msg.id).limit(delete_count)
+        })
+        .await?;
+
+    for msg in messages.into_iter() {
+        if msg.is_own(ctx).await {
+            channel.delete_message(ctx, msg.id).await?;
         }
     }
 
@@ -68,12 +71,15 @@ async fn delete(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
+#[description = "Prints the messages content to the console."]
 async fn debug(_: &Context, msg: &Message) -> CommandResult {
     event!(tracing::Level::INFO, "{}", msg.content);
     Ok(())
 }
 
 #[command]
+#[min_args(1)]
+#[description = "Sets the activity displayed under the bots name. The first argument needs to be either 'playing', 'listening', 'competing' or 'streaming'. In the case of the first three, it takes the rest of the passed arguments as displayed game/music/competion. In case of streaming it interprets the second argument as the stream URL and the rest as stream name."]
 async fn status(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let activity = match args.single::<String>()?.as_str() {
