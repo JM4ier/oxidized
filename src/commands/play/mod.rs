@@ -20,6 +20,7 @@ pub struct Games;
 #[command]
 #[only_in(guilds)]
 #[description("The classic 3x3 game without strategy.")]
+#[usage = "<enemy_player>"]
 async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
     pvp_game(ctx, prompt, tictactoe::TTTField::default()).await
 }
@@ -32,6 +33,7 @@ Where you move in the small field determines which field your opponent is going 
 A win in a small field counts as a mark on the big field.
 You win if you have three in a row, column or diagonal in the big field."
 )]
+#[usage = "<enemy_player>"]
 async fn ultimate(ctx: &Context, prompt: &Message) -> CommandResult {
     pvp_game(ctx, prompt, ultimate::UltimateGame::new()).await
 }

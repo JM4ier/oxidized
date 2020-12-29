@@ -5,6 +5,7 @@ use serenity::prelude::*;
 use std::time::*;
 
 #[command]
+#[description = "Time it takes for the bot to do an action."]
 async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
     let before_ping = Instant::now();
     let mut ping = msg

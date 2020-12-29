@@ -38,7 +38,9 @@ async fn quit(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 #[min_args(2)]
-#[description = "The first argument is the number of times to repeat the rest of the message."]
+#[description = "Repeats a message n times."]
+#[usage = "<n> <message>"]
+#[example = "5 Hello, World!"]
 async fn repeat(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let count = args.single::<u32>()?;
@@ -51,6 +53,9 @@ async fn repeat(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 #[description = "Deletes the bots messages. If no argument is provided, it goes through the last 100 messages and deletes the bots messages. If an argument 'x' is provided, it will go throught the last x messages of the channel."]
+#[usage = "[<number>]"]
+#[example = ""]
+#[example = "25"]
 async fn delete(ctx: &Context, msg: &Message) -> CommandResult {
     let delete_count = msg.args().single::<u64>().unwrap_or(100);
     let channel = msg.channel_id;
@@ -80,6 +85,10 @@ async fn debug(_: &Context, msg: &Message) -> CommandResult {
 #[command]
 #[min_args(1)]
 #[description = "Sets the activity displayed under the bots name. The first argument needs to be either 'playing', 'listening', 'competing' or 'streaming'. In the case of the first three, it takes the rest of the passed arguments as displayed game/music/competion. In case of streaming it interprets the second argument as the stream URL and the rest as stream name."]
+#[usage = "[playing | listening | competing | streaming] <activity>"]
+#[example = "playing Factorio"]
+#[example = "streaming https://www.twitch.tv/badplayzrl Rocket League"]
+#[example = "listening your commands"]
 async fn status(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let activity = match args.single::<String>()?.as_str() {
