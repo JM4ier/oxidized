@@ -33,7 +33,9 @@ pub struct Brainfuck;
 
 #[command]
 #[min_args(1)]
-#[description = "The first argument is the brainfuck program. The rest of the message is given as input to the brainfuck program when it is executed. See [here](https://esolangs.org/wiki/Brainfuck) for an introduction to the language."]
+#[description = "Executes a brainfuck program. See [here](https://esolangs.org/wiki/Brainfuck) for an introduction to the language."]
+#[usage = "<program> <input>"]
+#[example = ",[.,]. echo"]
 async fn brainfuck(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let program = args.single::<String>()?;
@@ -162,9 +164,9 @@ fn create_table() -> Result<()> {
 #[command]
 #[min_args(2)]
 #[max_args(2)]
-#[description = "Stores a brainfuck program for repeated usage."]
-#[usage = "store <name> <program>"]
-#[example = "store backwards >,[>,]<[.<]"]
+#[description = "Stores a brainfuck program for later or repeated usage."]
+#[usage = "<name> <program>"]
+#[example = "reverse >,[>,]<[.<]"]
 pub async fn store(_: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let name = args.single::<String>()?;
@@ -216,6 +218,9 @@ fn load_program(name: String, msg: &Message) -> CommandResult<String> {
 #[command]
 #[min_args(1)]
 #[max_args(1)]
+#[description = "Loads a stored brainfuck program and displays it to you."]
+#[usage = "<name>"]
+#[example = "reverse"]
 pub async fn load(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let name = args.single::<String>()?;
@@ -226,6 +231,10 @@ pub async fn load(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
+#[min_args(1)]
+#[description = "Loads a stored brainfuck program and runs it on an input given by you."]
+#[usage = "<name> <input>"]
+#[example = "reverse Hello, World!"]
 pub async fn run(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let name = args.single::<String>()?;
