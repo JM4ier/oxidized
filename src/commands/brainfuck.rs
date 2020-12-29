@@ -32,6 +32,8 @@ enum Instr {
 pub struct Brainfuck;
 
 #[command]
+#[min_args(1)]
+#[description = "The first argument is the brainfuck program. The rest of the message is given as input to the brainfuck program when it is executed. See [here](https://esolangs.org/wiki/Brainfuck) for an introduction to the language."]
 async fn brainfuck(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let program = args.single::<String>()?;
@@ -160,6 +162,9 @@ fn create_table() -> Result<()> {
 #[command]
 #[min_args(2)]
 #[max_args(2)]
+#[description = "Stores a brainfuck program for repeated usage."]
+#[usage = "store <name> <program>"]
+#[example = "store backwards >,[>,]<[.<]"]
 pub async fn store(_: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let name = args.single::<String>()?;
