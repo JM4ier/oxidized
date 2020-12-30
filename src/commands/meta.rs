@@ -2,7 +2,7 @@ use crate::prelude::*;
 use serenity::framework::standard::{macros::command, CommandResult};
 use serenity::model::channel::*;
 use serenity::prelude::*;
-use std::time::*;
+use std::{fs::*, io::*, time::*};
 
 #[command]
 #[description = "Time it takes for the bot to do an action."]
@@ -49,5 +49,28 @@ async fn info(ctx: &Context, msg: &Message) -> CommandResult {
             })
         })
         .await?;
+    Ok(())
+}
+
+#[command]
+#[description = "Report a bug"]
+#[example = r#"The bot doesn't respond with "nice" when writing 69."#]
+async fn bug(_: &Context, msg: &Message) -> CommandResult {
+    let bug = msg.args().rest().replace("\n", "\\n");
+    let author = format!(
+        "{}#{}({})",
+        msg.author.name,
+        msg.author.discriminator,
+        msg.author.id.as_u64()
+    );
+    let bug_txt = format!("{}: {}\n", author, bug);
+
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(format!("{}/{}", LOG_DIR, "bugs.txt"))?;
+
+    file.write_all(bug_txt.as_bytes())?;
+
     Ok(())
 }

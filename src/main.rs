@@ -69,7 +69,7 @@ pub async fn after(ctx: &Context, msg: &Message, _: &str, err: Result<(), Comman
 
 #[group]
 #[help_available]
-#[commands(info, ping, solution, random)]
+#[commands(bug, info, ping, solution, random)]
 struct General;
 
 pub fn command_groups() -> Vec<&'static CommandGroup> {
