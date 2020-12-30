@@ -12,7 +12,7 @@ use serenity::{
     prelude::*,
 };
 use std::{collections::HashSet, env, sync::Arc};
-use tracing::{error, info};
+use tracing::*;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 pub struct ShardManagerContainer;
@@ -65,6 +65,14 @@ pub async fn after(ctx: &Context, msg: &Message, _: &str, err: Result<(), Comman
     let _ = msg
         .react(ctx, ReactionType::Unicode(String::from(reaction)))
         .await;
+    if let Err(err) = err {
+        event!(
+            tracing::Level::INFO,
+            r#"Message "{}" caused "{}""#,
+            msg.content,
+            err
+        );
+    }
 }
 
 #[group]
