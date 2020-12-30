@@ -66,8 +66,8 @@ async fn bug(_: &Context, msg: &Message) -> CommandResult {
     let bug_txt = format!("{}: {}\n", author, bug);
 
     let mut file = OpenOptions::new()
-        .create(true)
         .append(true)
+        .create(true)
         .open(format!("{}/{}", LOG_DIR, "bugs.txt"))?;
 
     file.write_all(bug_txt.as_bytes())?;
