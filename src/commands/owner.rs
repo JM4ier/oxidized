@@ -14,7 +14,7 @@ use tracing::*;
 #[group]
 #[owners_only]
 #[prefix = "sudo"]
-#[commands(quit, repeat, delete, debug, status)]
+#[commands(quit, repeat, delete, debug, status, nick)]
 pub struct Management;
 
 #[command]
@@ -85,7 +85,7 @@ async fn debug(_: &Context, msg: &Message) -> CommandResult {
 #[command]
 #[min_args(1)]
 #[description = "Sets the activity displayed under the bots name. The first argument needs to be either 'playing', 'listening', 'competing' or 'streaming'. In the case of the first three, it takes the rest of the passed arguments as displayed game/music/competion. In case of streaming it interprets the second argument as the stream URL and the rest as stream name."]
-#[usage = "[playing | listening | competing | streaming] <activity>"]
+#[usage = "(playing | listening | competing | streaming <url>) <activity>"]
 #[example = "playing Factorio"]
 #[example = "streaming https://www.twitch.tv/badplayzrl Rocket League"]
 #[example = "listening your commands"]
@@ -99,8 +99,24 @@ async fn status(ctx: &Context, msg: &Message) -> CommandResult {
             let url = args.single::<String>()?;
             Activity::streaming(args.rest(), &url)
         }
-        _ => return Err(std::convert::From::from("invalid activity type")),
+        _ => return Err(From::from("invalid activity type")),
     };
     ctx.shard.set_activity(Some(activity));
+    Ok(())
+}
+
+#[command]
+#[description = "Changes the nickname of the bot for the current guild"]
+#[usage = "[<nickname>]"]
+#[example = ""]
+#[example = "bot"]
+async fn nick(ctx: &Context, msg: &Message) -> CommandResult {
+    let nick = msg.args().single::<String>().ok();
+    let nick = nick.as_ref().map(String::as_str);
+    let guild = *msg
+        .guild_id
+        .ok_or("This message was not send in a guild.")?
+        .as_u64();
+    ctx.http.edit_nickname(guild, nick).await?;
     Ok(())
 }
