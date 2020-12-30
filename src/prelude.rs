@@ -11,7 +11,6 @@ pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 pub const BUILD_DATE: &'static str = env!("BUILD_DATE");
 pub const DISCORD_AUTHOR: &'static str = "<@!177498563637542921>";
 pub const PREFIX: &'static str = "=";
-pub const LOG_DIR: &'static str = "~";
 
 fn commands() -> Vec<&'static str> {
     let mut groups = VecDeque::from(command_groups());
