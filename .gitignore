@@ -1,3 +1,4 @@
 /target
 /.discord_token
 /oxidized.db
+/Cargo.lock
