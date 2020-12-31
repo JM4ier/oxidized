@@ -30,22 +30,24 @@ async fn info(ctx: &Context, msg: &Message) -> CommandResult {
         .send_message(&ctx.http, |m| {
             m.embed(|e| {
                 e.title(format!("{} info page", NAME));
-                e.description("All the info you could want");
+                e.description(format!(
+                    "Information about the bot itself. Use `{}help` to get a list of commands.",
+                    PREFIX
+                ));
                 e.field(
                     "Author",
-                    format!(
-                        " {} | [GitHub Profile](https://github.com/JM4ier)",
-                        DISCORD_AUTHOR
-                    ),
+                    format!(" {} | [GitHub](https://github.com/JM4ier)", DISCORD_AUTHOR),
                     false,
                 );
                 e.field("Version", format!("{} v{}", NAME, VERSION), false);
                 e.field(
                     "Source",
-                    "[GitHub Repository](https://github.com/JM4ier/oxidized)",
+                    "[Repository](https://github.com/JM4ier/oxidized)",
                     false,
                 );
-                e.field("Build", format!("`{}`", BUILD_DATE), false)
+                e.field("Build Time", format!("`{}`", BUILD_DATE), false);
+                e.field("Start Time", format!("`{}`", *START_DATE), false);
+                e.field("System", format!("`{}`", *SYSTEM_NAME), false)
             })
         })
         .await?;

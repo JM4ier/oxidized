@@ -726,6 +726,7 @@ version = "0.3.3"
 dependencies = [
  "chrono",
  "dotenv",
+ "lazy_static",
  "rand",
  "rand_pcg",
  "rusqlite",

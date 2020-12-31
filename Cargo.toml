@@ -1,6 +1,6 @@
 [package]
 name = "oxidized"
-version = "0.3.3"
+version = "0.3.4"
 authors = ["Jonas Maier"]
 edition = "2018"
 
@@ -12,6 +12,8 @@ tracing-futures = "0.2" # needed so intrument works with async functions.
 rand = "0.7.3"
 rand_pcg = "0.2.1"
 rusqlite = "0.24"
+chrono = "0.4"
+lazy_static = "1.4"
 
 [dependencies.tokio]
 version = "0.2"

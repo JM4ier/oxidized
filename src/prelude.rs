@@ -1,8 +1,9 @@
 #![allow(unused)]
 use super::command_groups;
+use chrono::prelude::*;
 use rusqlite::{params, Connection};
 use serenity::framework::standard::*;
-use serenity::model::prelude::*;
+use serenity::model::prelude::Message;
 use std::collections::*;
 
 pub const NAME: &'static str = env!("CARGO_PKG_NAME");
@@ -76,4 +77,16 @@ macro_rules! tryc {
 
 pub fn db() -> rusqlite::Result<Connection> {
     Connection::open("./oxidized.db")
+}
+
+lazy_static! {
+    pub static ref START_DATE: String = Utc::now().format("UTC %Y-%m-%d %H:%M:%S").to_string();
+    pub static ref SYSTEM_NAME: String = {
+        std::process::Command::new("sh")
+            .arg("-c")
+            .arg("uname -n")
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+            .unwrap_or(String::from("unknown"))
+    };
 }
