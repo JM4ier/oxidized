@@ -218,17 +218,38 @@ fn load_program(name: String, msg: &Message) -> CommandResult<String> {
 }
 
 #[command]
-#[min_args(1)]
 #[max_args(1)]
-#[description = "Loads a stored brainfuck program and displays it to you."]
-#[usage = "<name>"]
+#[description = "Loads a stored brainfuck program and displays it to you, or displays the names of all stored programs."]
+#[usage = "[<name>]"]
 #[example = "reverse"]
 pub async fn load(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
-    let name = args.single::<String>()?;
-    let program = load_program(name, msg)?;
-    msg.reply(ctx, format!("```brainfuck\n{}\n```", program))
-        .await?;
+    match args.single::<String>() {
+        Ok(name) => {
+            let program = load_program(name, msg)?;
+            msg.reply(ctx, format!("```brainfuck\n{}\n```", program))
+                .await?;
+        }
+        Err(_) => {
+            let programs = {
+                let db = db()?;
+                let mut stmt = db.prepare("SELECT name FROM brainfuck WHERE author = ?1")?;
+                let program_iter = stmt
+                    .query_map(params!(format!("{}", msg.author.id)), |row| {
+                        Ok(row.get::<_, String>(0)?)
+                    })?;
+
+                let mut programs = String::from("```\n");
+                for program in program_iter {
+                    programs += &program?;
+                    programs += "\n";
+                }
+                programs + "```"
+            };
+
+            msg.reply(ctx, programs).await?;
+        }
+    }
     Ok(())
 }
 
