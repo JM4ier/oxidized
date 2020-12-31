@@ -46,7 +46,7 @@ async fn brainfuck(ctx: &Context, msg: &Message) -> CommandResult {
 async fn make_exec(ctx: &Context, msg: &Message, input: &str, program: &str) -> CommandResult {
     let program = make_program(&program)?;
 
-    let (output, exit_code) = execute(&program, input.as_bytes(), 1.0, 1000);
+    let (iter, output, exit_code) = execute(&program, input.as_bytes(), 1.0, 1000);
     let output = String::from_utf8_lossy(&output);
 
     msg.channel_id
@@ -54,7 +54,7 @@ async fn make_exec(ctx: &Context, msg: &Message, input: &str, program: &str) -> 
             m.embed(|e| {
                 e.title("Brainfuck Program Execution");
                 e.field("Output", output, false);
-                e.field("Exit Code", format!("{:?}", exit_code), false)
+                e.field("Exit Info", format!("{:?}({})", exit_code, iter), false)
             })
         })
         .await?;
@@ -106,7 +106,7 @@ fn execute(
     mut input: &[u8],
     time_limit: f64,
     char_limit: usize,
-) -> (Vec<u8>, ExitCode) {
+) -> (usize, Vec<u8>, ExitCode) {
     let mut output = "\u{200b}".as_bytes().to_owned();
     let mut ptr = 0usize;
     let mut data = vec![0u8; 30_000];
@@ -114,7 +114,9 @@ fn execute(
 
     let begin = Instant::now();
 
+    let mut iter = 0;
     while begin.elapsed().as_secs_f64() < time_limit {
+        iter += 1;
         let instr = code[instr_ptr];
         match instr {
             Instr::MoveRight => ptr = (ptr + 1) % data.len(),
@@ -146,11 +148,11 @@ fn execute(
                     continue;
                 }
             }
-            Instr::Terminate => return (output, ExitCode::Success),
+            Instr::Terminate => return (iter, output, ExitCode::Success),
         }
         instr_ptr += 1;
     }
-    (output, ExitCode::Timeout)
+    (iter, output, ExitCode::Timeout)
 }
 
 fn create_table() -> Result<()> {
