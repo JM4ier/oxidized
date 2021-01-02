@@ -75,7 +75,7 @@ fn embed_template<'u, 'c: 'u>(author: &'u User, e: &'c mut CreateEmbed) -> &'c m
         author.avatar_url().map(|url| f.icon_url(url));
         f
     });
-    e.color(Color::from_rgb(0x33, 0x00, 0x00))
+    e.color(Color::new(0x046B2F))
 }
 
 #[async_trait]
