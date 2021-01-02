@@ -201,9 +201,9 @@ pub async fn store(_: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-fn load_program(name: String, msg: &Message) -> CommandResult<String> {
+fn load_program(name: &str, msg: &Message) -> CommandResult<String> {
     let author = format!("{}", msg.author.id);
-    if name.as_str().chars().any(|ch| !ch.is_ascii_alphabetic()) {
+    if name.chars().any(|ch| !ch.is_ascii_alphabetic()) {
         Err("Invalid program name")?;
     }
 
@@ -226,8 +226,14 @@ pub async fn load(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     match args.single::<String>() {
         Ok(name) => {
-            let program = load_program(name, msg)?;
-            msg.reply(ctx, format!("```brainfuck\n{}\n```", program))
+            let program = load_program(&name, msg)?;
+            msg.channel_id
+                .send_message(ctx, |m| {
+                    m.embed(|e| {
+                        e.title(format!("{}.bf", name));
+                        e.field("\u{200b}", format!("```\n{}\n```", program), false)
+                    })
+                })
                 .await?;
         }
         Err(_) => {
@@ -247,7 +253,14 @@ pub async fn load(ctx: &Context, msg: &Message) -> CommandResult {
                 programs + "```"
             };
 
-            msg.reply(ctx, programs).await?;
+            msg.channel_id
+                .send_message(ctx, |m| {
+                    m.embed(|e| {
+                        e.title("Your stored brainfuck programs");
+                        e.field("\u{200b}", programs, false)
+                    })
+                })
+                .await?;
         }
     }
     Ok(())
@@ -261,7 +274,7 @@ pub async fn load(ctx: &Context, msg: &Message) -> CommandResult {
 pub async fn run(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let name = args.single::<String>()?;
-    let program = load_program(name, msg)?;
+    let program = load_program(&name, msg)?;
     let input = args.rest();
     make_exec(ctx, msg, &input, &program).await
 }
