@@ -227,14 +227,11 @@ pub async fn load(ctx: &Context, msg: &Message) -> CommandResult {
     match args.single::<String>() {
         Ok(name) => {
             let program = load_program(&name, msg)?;
-            msg.channel_id
-                .send_message(ctx, |m| {
-                    m.embed(|e| {
-                        e.title(format!("{}.bf", name));
-                        e.field("\u{200b}", format!("```\n{}\n```", program), false)
-                    })
-                })
-                .await?;
+            msg.ereply(ctx, |e| {
+                e.title(format!("{}.bf", name));
+                e.field("\u{200b}", format!("```\n{}\n```", program), false)
+            })
+            .await?;
         }
         Err(_) => {
             let programs = {
@@ -253,14 +250,11 @@ pub async fn load(ctx: &Context, msg: &Message) -> CommandResult {
                 programs + "```"
             };
 
-            msg.channel_id
-                .send_message(ctx, |m| {
-                    m.embed(|e| {
-                        e.title("Your stored brainfuck programs");
-                        e.field("\u{200b}", programs, false)
-                    })
-                })
-                .await?;
+            msg.ereply(ctx, |e| {
+                e.title("Your stored brainfuck programs");
+                e.field("\u{200b}", programs, false)
+            })
+            .await?;
         }
     }
     Ok(())

@@ -14,6 +14,7 @@ rand_pcg = "0.2.1"
 rusqlite = "0.24"
 chrono = "0.4"
 lazy_static = "1.4"
+async-trait = "0.1"
 
 [dependencies.tokio]
 version = "0.2"

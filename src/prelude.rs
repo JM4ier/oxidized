@@ -1,9 +1,12 @@
 #![allow(unused)]
 use super::command_groups;
+use async_trait::async_trait;
 use chrono::prelude::*;
 use rusqlite::{params, Connection};
+use serenity::builder::*;
 use serenity::framework::standard::*;
 use serenity::model::prelude::Message;
+use serenity::prelude::*;
 use std::collections::*;
 
 pub const NAME: &'static str = env!("CARGO_PKG_NAME");
@@ -58,6 +61,38 @@ impl MessageArgs for Message {
         let mut args = Args::new(args.rest(), &delimiter);
         args.quoted();
         args
+    }
+}
+
+#[async_trait]
+pub trait EmbedReply {
+    async fn ereply<F>(&self, ctx: &Context, f: F) -> Result<Message, SerenityError>
+    where
+        F: Send + FnOnce(&mut CreateEmbed) -> &mut CreateEmbed;
+}
+#[async_trait]
+impl EmbedReply for Message {
+    async fn ereply<F>(&self, ctx: &Context, fun: F) -> Result<Message, SerenityError>
+    where
+        F: Send + FnOnce(&mut CreateEmbed) -> &mut CreateEmbed,
+    {
+        self.channel_id
+            .send_message(ctx, |m| {
+                m.embed(|e| {
+                    fun(e);
+                    e.footer(|f| {
+                        f.text(format!(
+                            "on behalf of {}#{:04}",
+                            self.author.name, self.author.discriminator
+                        ));
+                        if let Some(avatar) = self.author.avatar_url() {
+                            f.icon_url(avatar);
+                        }
+                        f
+                    })
+                })
+            })
+            .await
     }
 }
 
