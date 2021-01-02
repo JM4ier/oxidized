@@ -8,6 +8,7 @@ use serenity::framework::standard::*;
 use serenity::model::prelude::Message;
 use serenity::model::user::*;
 use serenity::prelude::*;
+use serenity::utils::*;
 use std::collections::*;
 
 pub const NAME: &'static str = env!("CARGO_PKG_NAME");
@@ -68,14 +69,13 @@ impl MessageArgs for Message {
 fn embed_template<'u, 'c: 'u>(author: &'u User, e: &'c mut CreateEmbed) -> &'c mut CreateEmbed {
     e.footer(|f| {
         f.text(format!(
-            "on behalf of {}#{:04}",
+            "summoned by {}#{:04}",
             author.name, author.discriminator
         ));
-        if let Some(avatar) = author.avatar_url() {
-            f.icon_url(avatar);
-        }
+        author.avatar_url().map(|url| f.icon_url(url));
         f
-    })
+    });
+    e.color(Color::from_rgb(0x33, 0x00, 0x00))
 }
 
 #[async_trait]
@@ -93,8 +93,8 @@ impl EmbedReply for Message {
         self.channel_id
             .send_message(ctx, |m| {
                 m.embed(|e| {
-                    fun(e);
-                    embed_template(&self.author, e)
+                    embed_template(&self.author, e);
+                    fun(e)
                 })
             })
             .await
@@ -113,19 +113,18 @@ impl EmbedEdit for Message {
         F: Send + FnOnce(&mut CreateEmbed) -> &mut CreateEmbed,
     {
         let footer = self.embeds.iter().filter_map(|e| e.footer.clone()).next();
+        let colour = self.embeds.iter().next().map(|e| e.colour);
+
         self.edit(ctx, |m| {
             m.embed(|e| {
-                fun(e);
-                if let Some(footer) = footer {
+                colour.map(|c| e.colour(c));
+                footer.map(|footer| {
                     e.footer(|f| {
-                        f.text(footer.text);
-                        if let Some(url) = footer.icon_url {
-                            f.icon_url(url);
-                        }
-                        f
-                    });
-                }
-                e
+                        footer.icon_url.map(|i| f.icon_url(i));
+                        f.text(footer.text)
+                    })
+                });
+                fun(e)
             })
         })
         .await
