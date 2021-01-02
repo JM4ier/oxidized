@@ -66,11 +66,20 @@ impl MessageArgs for Message {
     }
 }
 
-fn embed_template<'u, 'c: 'u>(author: &'u User, e: &'c mut CreateEmbed) -> &'c mut CreateEmbed {
+fn embed_template<'u, 'c: 'u>(msg: &'u Message, e: &'c mut CreateEmbed) -> &'c mut CreateEmbed {
+    let author = &msg.author;
+
+    let name = msg
+        .member
+        .as_ref()
+        .and_then(|m| m.nick.as_ref())
+        .unwrap_or(&author.name);
+
     e.footer(|f| {
         author.avatar_url().map(|url| f.icon_url(url));
-        f.text(format!("summoned by {}", author.mention()))
+        f.text(format!("summoned by {}", name))
     });
+
     e.color(Color::new(0x046B2F))
 }
 
@@ -89,7 +98,7 @@ impl EmbedReply for Message {
         self.channel_id
             .send_message(ctx, |m| {
                 m.embed(|e| {
-                    embed_template(&self.author, e);
+                    embed_template(self, e);
                     fun(e)
                 })
             })

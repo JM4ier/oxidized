@@ -150,6 +150,8 @@ async fn main() {
         shard_manager.lock().await.shutdown_all().await;
     });
 
+    event!(tracing::Level::INFO, "Started bot at {}.", *START_DATE);
+
     if let Err(why) = client.start().await {
         error!("Client error: {:?}", why);
     }
