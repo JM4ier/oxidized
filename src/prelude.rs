@@ -68,12 +68,8 @@ impl MessageArgs for Message {
 
 fn embed_template<'u, 'c: 'u>(author: &'u User, e: &'c mut CreateEmbed) -> &'c mut CreateEmbed {
     e.footer(|f| {
-        f.text(format!(
-            "summoned by {}#{:04}",
-            author.name, author.discriminator
-        ));
         author.avatar_url().map(|url| f.icon_url(url));
-        f
+        f.text(format!("summoned by {}", author.mention()))
     });
     e.color(Color::new(0x046B2F))
 }
