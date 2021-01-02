@@ -8,49 +8,43 @@ use std::{fs::*, io::*, time::*};
 #[description = "Time it takes for the bot to do an action."]
 async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
     let before_ping = Instant::now();
-    let mut ping = msg
-        .channel_id
-        .send_message(&ctx.http, |m| m.embed(|e| e.title("Ping Stats")))
-        .await?;
+    let mut ping = msg.ereply(ctx, |e| e.title("Ping Stats")).await?;
     let elapsed = before_ping.elapsed().as_millis();
-    ping.edit(&ctx.http, |m| {
-        m.embed(|e| {
-            e.title("Ping Stats");
-            e.field("Roundtrip", format!("`{}ms`", elapsed), false)
-        })
+
+    ping.eedit(ctx, |e| {
+        e.title("Ping Stats");
+        e.field("Roundtrip", format!("`{}ms`", elapsed), false)
     })
     .await?;
+
     Ok(())
 }
 
 #[command]
 #[aliases(about)]
 async fn info(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.channel_id
-        .send_message(&ctx.http, |m| {
-            m.embed(|e| {
-                e.title(format!("{} info page", NAME));
-                e.description(format!(
-                    "Information about the bot itself. Use `{}help` to get a list of commands.",
-                    PREFIX
-                ));
-                e.field(
-                    "Author",
-                    format!(" {} | [GitHub](https://github.com/JM4ier)", DISCORD_AUTHOR),
-                    false,
-                );
-                e.field("Version", format!("{} v{}", NAME, VERSION), false);
-                e.field(
-                    "Source",
-                    "[Repository](https://github.com/JM4ier/oxidized)",
-                    false,
-                );
-                e.field("Build Time", format!("`{}`", BUILD_DATE), false);
-                e.field("Start Time", format!("`{}`", *START_DATE), false);
-                e.field("System", format!("`{}`", *SYSTEM_NAME), false)
-            })
-        })
-        .await?;
+    msg.ereply(ctx, |e| {
+        e.title(format!("{} info page", NAME));
+        e.description(format!(
+            "Information about the bot itself. Use `{}help` to get a list of commands.",
+            PREFIX
+        ));
+        e.field(
+            "Author",
+            format!(" {} | [GitHub](https://github.com/JM4ier)", DISCORD_AUTHOR),
+            false,
+        );
+        e.field("Version", format!("{} v{}", NAME, VERSION), false);
+        e.field(
+            "Source",
+            "[Repository](https://github.com/JM4ier/oxidized)",
+            false,
+        );
+        e.field("Build Time", format!("`{}`", BUILD_DATE), false);
+        e.field("Start Time", format!("`{}`", *START_DATE), false);
+        e.field("System", format!("`{}`", *SYSTEM_NAME), false)
+    })
+    .await?;
     Ok(())
 }
 

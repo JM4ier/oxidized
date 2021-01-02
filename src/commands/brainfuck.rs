@@ -49,15 +49,12 @@ async fn make_exec(ctx: &Context, msg: &Message, input: &str, program: &str) -> 
     let (iter, output, exit_code) = execute(&program, input.as_bytes(), 1.0, 1000);
     let output = String::from_utf8_lossy(&output);
 
-    msg.channel_id
-        .send_message(ctx, |m| {
-            m.embed(|e| {
-                e.title("Brainfuck Program Execution");
-                e.field("Output", output, false);
-                e.field("Exit Info", format!("{:?}({})", exit_code, iter), false)
-            })
-        })
-        .await?;
+    msg.ereply(ctx, |e| {
+        e.title("Brainfuck Program Execution");
+        e.field("Output", output, false);
+        e.field("Exit Info", format!("{:?}({})", exit_code, iter), false)
+    })
+    .await?;
 
     Ok(())
 }

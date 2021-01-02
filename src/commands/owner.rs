@@ -24,12 +24,18 @@ async fn quit(ctx: &Context, msg: &Message) -> CommandResult {
     let data = ctx.data.read().await;
 
     if let Some(manager) = data.get::<ShardManagerContainer>() {
-        msg.reply(ctx, "Shutting down!").await?;
+        msg.ereply(ctx, |e| {
+            e.title("Shutting down!");
+            e.description("Hopefully going alright")
+        })
+        .await?;
         manager.lock().await.shutdown_all().await;
     } else {
-        msg.reply(ctx, "There was a problem getting the shard manager")
-            .await?;
-
+        msg.ereply(ctx, |e| {
+            e.title("Error");
+            e.description("There was a problem getting the shard manager")
+        })
+        .await?;
         return Ok(());
     }
 

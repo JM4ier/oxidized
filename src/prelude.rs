@@ -6,6 +6,7 @@ use rusqlite::{params, Connection};
 use serenity::builder::*;
 use serenity::framework::standard::*;
 use serenity::model::prelude::Message;
+use serenity::model::user::*;
 use serenity::prelude::*;
 use std::collections::*;
 
@@ -64,6 +65,19 @@ impl MessageArgs for Message {
     }
 }
 
+fn embed_template<'u, 'c: 'u>(author: &'u User, e: &'c mut CreateEmbed) -> &'c mut CreateEmbed {
+    e.footer(|f| {
+        f.text(format!(
+            "on behalf of {}#{:04}",
+            author.name, author.discriminator
+        ));
+        if let Some(avatar) = author.avatar_url() {
+            f.icon_url(avatar);
+        }
+        f
+    })
+}
+
 #[async_trait]
 pub trait EmbedReply {
     async fn ereply<F>(&self, ctx: &Context, f: F) -> Result<Message, SerenityError>
@@ -80,19 +94,41 @@ impl EmbedReply for Message {
             .send_message(ctx, |m| {
                 m.embed(|e| {
                     fun(e);
-                    e.footer(|f| {
-                        f.text(format!(
-                            "on behalf of {}#{:04}",
-                            self.author.name, self.author.discriminator
-                        ));
-                        if let Some(avatar) = self.author.avatar_url() {
-                            f.icon_url(avatar);
-                        }
-                        f
-                    })
+                    embed_template(&self.author, e)
                 })
             })
             .await
+    }
+}
+#[async_trait]
+pub trait EmbedEdit {
+    async fn eedit<F>(&mut self, ctx: &Context, f: F) -> Result<(), SerenityError>
+    where
+        F: Send + FnOnce(&mut CreateEmbed) -> &mut CreateEmbed;
+}
+#[async_trait]
+impl EmbedEdit for Message {
+    async fn eedit<F>(&mut self, ctx: &Context, fun: F) -> Result<(), SerenityError>
+    where
+        F: Send + FnOnce(&mut CreateEmbed) -> &mut CreateEmbed,
+    {
+        let footer = self.embeds.iter().filter_map(|e| e.footer.clone()).next();
+        self.edit(ctx, |m| {
+            m.embed(|e| {
+                fun(e);
+                if let Some(footer) = footer {
+                    e.footer(|f| {
+                        f.text(footer.text);
+                        if let Some(url) = footer.icon_url {
+                            f.icon_url(url);
+                        }
+                        f
+                    });
+                }
+                e
+            })
+        })
+        .await
     }
 }
 

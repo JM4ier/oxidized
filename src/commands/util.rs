@@ -17,19 +17,16 @@ async fn random(ctx: &Context, msg: &Message) -> CommandResult {
     }
 
     let word = words.choose(&mut rand::thread_rng());
-    msg.channel_id
-        .send_message(&ctx.http, |m| {
-            m.embed(|e| {
-                e.title("Random element");
-                if let Some(word) = word {
-                    e.description(format!("{} has chosen `{}` for you", NAME, word))
-                } else {
-                    e.colour(Colour::RED);
-                    e.description("Please specify a list of words.")
-                }
-            })
-        })
-        .await?;
+    msg.ereply(ctx, |e| {
+        e.title("Random element");
+        if let Some(word) = word {
+            e.description(format!("{} has been chosen.", word))
+        } else {
+            e.colour(Colour::RED);
+            e.description("Please specify a list of words.")
+        }
+    })
+    .await?;
 
     Ok(())
 }
