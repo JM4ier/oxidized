@@ -1,6 +1,6 @@
 [package]
 name = "oxidized"
-version = "0.3.8"
+version = "0.4.0"
 authors = ["Jonas Maier"]
 edition = "2018"
 
@@ -17,12 +17,12 @@ lazy_static = "1.4"
 async-trait = "0.1"
 
 [dependencies.tokio]
-version = "0.2"
-features = ["macros", "signal"]
+version = "1.0"
+features = ["macros", "signal", "rt-multi-thread"]
 
 [dependencies.serenity]
 features = ["cache", "collector", "framework", "standard_framework", "rustls_backend"]
-version = "0.9.2"
+version = "0.10"
 
 [build-dependencies]
 chrono = "0.4"
