@@ -1,8 +1,6 @@
 use super::tictactoe::*;
 use super::*;
 
-mod ai;
-
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct UltimateGame {
     field: [TTTField; 9],
