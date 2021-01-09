@@ -1,15 +1,18 @@
 use crate::{prelude::*, tryc};
-use serenity::builder::*;
+use lazy_static::*;
 use serenity::framework::standard::{macros::command, macros::*, CommandResult};
 use serenity::model::{channel::*, user::*};
 use serenity::prelude::*;
+use serenity::utils::Color;
 
 mod mcts;
 mod minimax;
+mod random_ai;
 mod tictactoe;
 mod ultimate;
 use mcts::*;
 use minimax::*;
+use random_ai::*;
 
 #[group]
 #[help_available]
@@ -61,7 +64,7 @@ pub trait PvpGame {
     /// All possible reactions to this game
     fn reactions() -> Vec<ReactionType>;
     /// Display the current board in the discord message
-    fn edit_message<'e>(&self, m: &'e mut EditMessage, ctx: &GameContext) -> &'e mut EditMessage;
+    fn draw(&self, ctx: &GameContext) -> String;
     /// Make a game move
     ///
     /// `idx` is the index of the reacted emoji
@@ -77,6 +80,11 @@ pub trait PvpGame {
     fn ai() -> Option<Box<dyn AiPlayer<Self>>> {
         None
     }
+    fn title() -> &'static str;
+    fn description() -> &'static str {
+        ""
+    }
+    fn figures() -> Vec<String>;
     fn is_empty(&self) -> bool;
 }
 
@@ -86,7 +94,6 @@ pub trait AiPlayer<G: PvpGame> {
 
 pub struct GameContext {
     players: Vec<User>,
-    shapes: Vec<char>,
     turn: usize,
 }
 
@@ -97,14 +104,21 @@ impl GameContext {
 }
 
 /// Plays a PvpGame where two people play against each other
-async fn pvp_game<G: PvpGame>(ctx: &Context, prompt: &Message, mut game: G) -> CommandResult {
+async fn pvp_game<G: PvpGame + Send + Sync>(
+    ctx: &Context,
+    prompt: &Message,
+    mut game: G,
+) -> CommandResult {
     let mut players = prompt.mentions.clone();
     players.push(prompt.author.clone());
 
     if players.len() != 2 {
         prompt
-            .channel_id
-            .say(&ctx.http, "You need to tag another person to play against!")
+            .ereply(ctx, |e| {
+                e.title("Error");
+                e.description("You need to tag another person to play against!");
+                e.color(Color::RED)
+            })
             .await?;
         return Ok(());
     }
@@ -120,28 +134,52 @@ async fn pvp_game<G: PvpGame>(ctx: &Context, prompt: &Message, mut game: G) -> C
     // check if the game even supports AI
     if ai_player_id.is_some() && G::ai().is_none() {
         prompt
-            .reply(&ctx.http, "This game doesn't support AI players.")
+            .ereply(ctx, |e| {
+                e.title("Error");
+                e.description("This game doesn't support AI players.");
+                e.color(Color::RED)
+            })
             .await?;
         return Ok(());
     }
 
     // create message and react
-    let mut message = prompt.reply_mention(&ctx.http, "Loading Game...").await?;
+    let mut message = prompt
+        .ereply(ctx, |e| e.title(G::title()).description("Loading game..."))
+        .await?;
     for r in G::reactions() {
         message.react(&ctx.http, r).await?;
     }
 
-    let mut game_ctx = GameContext {
-        players,
-        shapes: vec!['X', '@'],
-        turn: 0,
+    let mut game_ctx = GameContext { players, turn: 0 };
+
+    macro_rules! update_field {
+        () => {
+            message
+                .eedit(ctx, |e| {
+                    e.title(G::title());
+                    let desc = G::description();
+                    if desc.len() > 0 {
+                        e.description(desc);
+                    }
+                    e.field("Board", game.draw(&game_ctx), false);
+                    let status = match game.status() {
+                        GameState::Win(p) => format!("{} won!", game_ctx.players[p].mention()),
+                        GameState::Tie => String::from("It's a tie!"),
+                        _ => format!(
+                            "{}({}) plays next.",
+                            game_ctx.players[game_ctx.turn].mention(),
+                            G::figures()[game_ctx.turn]
+                        ),
+                    };
+                    e.field("Status", status, false)
+                })
+                .await?;
+        };
     };
 
     loop {
-        message
-            .edit(&ctx.http, |m| game.edit_message(m, &game_ctx))
-            .await?;
-
+        update_field!();
         let play = loop {
             let is_ai_move = Some(game_ctx.turn) == ai_player_id;
 
@@ -172,7 +210,9 @@ async fn pvp_game<G: PvpGame>(ctx: &Context, prompt: &Message, mut game: G) -> C
                     "The AI for this game sucks and tries to do invalid moves, {} pls fix.",
                     DISCORD_AUTHOR
                 );
-                message.reply(&ctx.http, reply).await?;
+                message
+                    .ereply(ctx, |e| e.title("Programming error").description(reply))
+                    .await?;
                 return Ok(());
             }
         };
@@ -184,12 +224,16 @@ async fn pvp_game<G: PvpGame>(ctx: &Context, prompt: &Message, mut game: G) -> C
         }
     }
 
-    message
-        .edit(&ctx.http, |m| game.edit_message(m, &game_ctx))
-        .await?;
+    update_field!();
     Ok(())
 }
 
+lazy_static! {
+    pub static ref NUMBERS: Vec<String> = (0..10)
+        .map(|num| format!("{}\u{fe0f}\u{20e3}", num))
+        .collect();
+}
+
 fn number_emoji(num: usize) -> ReactionType {
-    ReactionType::Unicode(format!("{}\u{fe0f}\u{20e3}", num))
+    ReactionType::Unicode(NUMBERS[num].clone())
 }

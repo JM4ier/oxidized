@@ -1,52 +1,11 @@
 use super::*;
 
-trait Draw {
-    fn draw(&self, player_symbols: &[char]) -> String;
-}
-
 pub type TTTField = [Option<usize>; 9];
 
-impl Draw for TTTField {
-    fn draw(&self, player_symbols: &[char]) -> String {
-        let mut grid = vec![vec![' '; 11]; 5];
-
-        // vertical lines
-        for x in 0..2 {
-            let x = 3 + 4 * x;
-            for y in 0..5 {
-                grid[y][x] = '|';
-            }
-        }
-
-        // horizontal lines
-        for y in 0..2 {
-            let y = 1 + 2 * y;
-            for x in 0..11 {
-                grid[y][x] = if grid[y][x] == '|' { '+' } else { '-' };
-            }
-        }
-
-        for row in 0..3 {
-            for col in 0..3 {
-                let idx = flatten_xy(col, row);
-                let ch = match self[idx] {
-                    None => std::char::from_digit(1 + (3 * row + col) as u32, 10).unwrap(),
-                    Some(p) => player_symbols[p],
-                };
-                grid[2 * row][1 + 4 * col] = ch;
-            }
-        }
-
-        // playing field string
-        let mut playing_field = String::new();
-        for line in grid.iter() {
-            playing_field += &format!("{}\n", line.iter().collect::<String>());
-        }
-        playing_field
-    }
-}
-
 impl PvpGame for TTTField {
+    fn title() -> &'static str {
+        "Tic Tac Toe"
+    }
     fn is_empty(&self) -> bool {
         *self == Self::default()
     }
@@ -81,39 +40,46 @@ impl PvpGame for TTTField {
     fn reactions() -> Vec<ReactionType> {
         (1..10).map(number_emoji).collect()
     }
-    fn edit_message<'e>(&self, m: &'e mut EditMessage, ctx: &GameContext) -> &'e mut EditMessage {
-        let title = String::from("TicTacToe!\n");
-        let subtitle = format!(
-            "{} plays `{}`\n{} plays `{}`\n",
-            ctx.players[0].mention(),
-            ctx.shapes[0],
-            ctx.players[1].mention(),
-            ctx.shapes[1]
-        );
+    fn figures() -> Vec<String> {
+        vec![String::from("@"), String::from("X")]
+    }
+    fn draw(&self, _: &GameContext) -> String {
+        let mut grid = vec![vec![' '; 11]; 5];
 
-        let playing_field = format!("```\n{}\n```\n", self.draw(&ctx.shapes));
-
-        let footer_text = {
-            if let Some(winner) = self.winner() {
-                format!("{} won!\n", ctx.players[winner].mention())
-            } else if self.status() == GameState::Tie {
-                format!("It's a tie!\n")
-            } else {
-                format!("`{}` plays next.\n", ctx.shapes[ctx.turn])
+        // vertical lines
+        for x in 0..2 {
+            let x = 3 + 4 * x;
+            for y in 0..5 {
+                grid[y][x] = '|';
             }
-        };
+        }
 
-        m.embed(|e| {
-            let title = title.clone();
-            let subtitle = subtitle.clone();
-            let playing_field = playing_field.clone();
-            let footer_text = footer_text.clone();
-            e.title(title);
-            e.description(subtitle);
-            e.field("Field", playing_field, false);
-            e.field("Game Status", footer_text, false);
-            e
-        })
+        // horizontal lines
+        for y in 0..2 {
+            let y = 1 + 2 * y;
+            for x in 0..11 {
+                grid[y][x] = if grid[y][x] == '|' { '+' } else { '-' };
+            }
+        }
+
+        for row in 0..3 {
+            for col in 0..3 {
+                let idx = flatten_xy(col, row);
+                let ch = match self[idx] {
+                    None => std::char::from_digit(1 + (3 * row + col) as u32, 10).unwrap(),
+                    Some(p) => ['@', 'X'][p],
+                };
+                grid[2 * row][1 + 4 * col] = ch;
+            }
+        }
+
+        // playing field string
+        let mut playing_field = String::from("```\n");
+        for line in grid.iter() {
+            playing_field += &format!("{}\n", line.iter().collect::<String>());
+        }
+        playing_field += "```";
+        playing_field
     }
     fn ai() -> Option<Box<dyn AiPlayer<Self>>> {
         Some(Box::new(Minimax(TTTAI)))
