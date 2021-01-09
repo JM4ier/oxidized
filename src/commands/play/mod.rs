@@ -126,7 +126,7 @@ async fn pvp_game<G: PvpGame>(ctx: &Context, prompt: &Message, mut game: G) -> C
     }
 
     // create message and react
-    let mut message = prompt.channel_id.say(&ctx.http, "Loading Game...").await?;
+    let mut message = prompt.reply_mention(&ctx.http, "Loading Game...").await?;
     for r in G::reactions() {
         message.react(&ctx.http, r).await?;
     }
