@@ -43,7 +43,7 @@ impl MessageArgs for Message {
         let delimiter = [Delimiter::Single(' ')];
 
         // remove leading prefix
-        let content = self.content.split(PREFIX).collect::<String>();
+        let content = self.content.clone().split_off(PREFIX.len());
 
         let mut args = Args::new(&content, &delimiter);
         let cmds = commands();
