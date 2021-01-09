@@ -8,13 +8,15 @@ use serenity::{
     model::prelude::*,
     prelude::*,
 };
+use std::fs::File;
+use std::io::Read;
 
 use tracing::*;
 
 #[group]
 #[owners_only]
 #[prefix = "sudo"]
-#[commands(quit, repeat, delete, debug, status, nick)]
+#[commands(quit, repeat, delete, debug, status, nick, cat)]
 pub struct Management;
 
 #[command]
@@ -124,5 +126,23 @@ async fn nick(ctx: &Context, msg: &Message) -> CommandResult {
         .ok_or("This message was not send in a guild.")?
         .as_u64();
     ctx.http.edit_nickname(guild, nick).await?;
+    Ok(())
+}
+
+#[command]
+#[description = "Reads a file"]
+#[usage = "<file>"]
+#[min_args(1)]
+async fn cat(ctx: &Context, msg: &Message) -> CommandResult {
+    let args = msg.args();
+    let file_name = args.rest();
+    let mut file = File::open(file_name)?;
+    let mut content = String::new();
+    file.read_to_string(&mut content)?;
+    msg.ereply(ctx, |e| {
+        e.title(file_name);
+        e.field("\u{200b}", content, false)
+    })
+    .await?;
     Ok(())
 }
