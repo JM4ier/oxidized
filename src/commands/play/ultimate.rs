@@ -7,16 +7,12 @@ pub struct UltimateGame {
     cell: usize,
 }
 
-const EMPTY: &'static str = "⬛";
-const BORDER: &'static str = "⬜";
-const TIE: &'static str = "🟦";
-
 impl PvpGame for UltimateGame {
     fn title() -> &'static str {
         "Ultimate Tic Tac Toe"
     }
     fn figures() -> Vec<String> {
-        vec![String::from("🟥"), String::from("🟨")]
+        TTTField::figures()
     }
     fn ai() -> Option<Box<dyn AiPlayer<Self>>> {
         Some(Box::new(RandomPlayer::<Self>::default()))

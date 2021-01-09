@@ -11,28 +11,34 @@ use serenity::prelude::*;
 use serenity::utils::*;
 use std::collections::*;
 
-pub const NAME: &'static str = env!("CARGO_PKG_NAME");
-pub const AUTHORS: &'static str = env!("CARGO_PKG_AUTHORS");
-pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
-pub const BUILD_DATE: &'static str = env!("BUILD_DATE");
-pub const DISCORD_AUTHOR: &'static str = "<@!177498563637542921>";
-pub const PREFIX: &'static str = "=";
+pub const NAME: &str = env!("CARGO_PKG_NAME");
+pub const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const BUILD_DATE: &str = env!("BUILD_DATE");
+pub const DISCORD_AUTHOR: &str = "<@!177498563637542921>";
+pub const PREFIX: &str = "=";
 
-fn commands() -> Vec<&'static str> {
+pub fn commands() -> Vec<&'static Command> {
     let mut groups = VecDeque::from(command_groups());
     let mut cmds = Vec::new();
 
     while let Some(group) = groups.pop_front() {
         for c in group.options.commands {
-            for n in c.options.names {
-                cmds.push(*n);
-            }
+            cmds.push(c.clone());
         }
         for g in group.options.sub_groups.iter() {
             groups.push_back(g);
         }
     }
     cmds
+}
+
+fn command_names() -> Vec<&'static str> {
+    commands()
+        .iter()
+        .flat_map(|c| c.options.names)
+        .map(|&c| c)
+        .collect()
 }
 
 pub trait MessageArgs {
@@ -46,7 +52,7 @@ impl MessageArgs for Message {
         let content = self.content.clone().split_off(PREFIX.len());
 
         let mut args = Args::new(&content, &delimiter);
-        let cmds = commands();
+        let cmds = command_names();
 
         // remove all group prefixes to find command
         loop {

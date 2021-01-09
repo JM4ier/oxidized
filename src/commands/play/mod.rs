@@ -1,6 +1,6 @@
 use crate::{prelude::*, tryc};
 use lazy_static::*;
-use serenity::framework::standard::{macros::command, macros::*, CommandResult};
+use serenity::framework::standard::{macros::command, macros::*, CommandResult, *};
 use serenity::model::{channel::*, user::*};
 use serenity::prelude::*;
 use serenity::utils::Color;
@@ -25,7 +25,7 @@ pub struct Games;
 #[description("The classic 3x3 game without strategy.")]
 #[usage = "<enemy_player>"]
 async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
-    pvp_game(ctx, prompt, tictactoe::TTTField::default()).await
+    pvp_game(ctx, prompt, tictactoe::TTTField::default(), "tictactoe").await
 }
 
 #[command]
@@ -33,12 +33,13 @@ async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
 #[description(
     "You play on a 3x3 grid of tictactoe fields.
 Where you move in the small field determines which field your opponent is going to play in next.
+If that targeted field is already occupied (won/lost/tied), the field with the next bigger index is chosen.
 A win in a small field counts as a mark on the big field.
 You win if you have three in a row, column or diagonal in the big field."
 )]
 #[usage = "<enemy_player>"]
 async fn ultimate(ctx: &Context, prompt: &Message) -> CommandResult {
-    pvp_game(ctx, prompt, ultimate::UltimateGame::new()).await
+    pvp_game(ctx, prompt, ultimate::UltimateGame::new(), "ultimate").await
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -81,9 +82,6 @@ pub trait PvpGame {
         None
     }
     fn title() -> &'static str;
-    fn description() -> &'static str {
-        ""
-    }
     fn figures() -> Vec<String>;
     fn is_empty(&self) -> bool;
 }
@@ -108,7 +106,15 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
     ctx: &Context,
     prompt: &Message,
     mut game: G,
+    cmd: &str,
 ) -> CommandResult {
+    let cmds = commands();
+    let cmd = cmds
+        .iter()
+        .filter(|c| c.options.names.contains(&cmd))
+        .next()
+        .unwrap();
+
     let mut players = prompt.mentions.clone();
     players.push(prompt.author.clone());
 
@@ -158,8 +164,7 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
             message
                 .eedit(ctx, |e| {
                     e.title(G::title());
-                    let desc = G::description();
-                    if desc.len() > 0 {
+                    if let Some(desc) = cmd.options.desc {
                         e.description(desc);
                     }
                     e.field("Board", game.draw(&game_ctx), false);

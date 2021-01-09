@@ -2,6 +2,10 @@ use super::*;
 
 pub type TTTField = [Option<usize>; 9];
 
+pub const EMPTY: &str = "⬛";
+pub const BORDER: &str = "⬜";
+pub const TIE: &str = "🟦";
+
 impl PvpGame for TTTField {
     fn title() -> &'static str {
         "Tic Tac Toe"
@@ -41,44 +45,41 @@ impl PvpGame for TTTField {
         (1..10).map(number_emoji).collect()
     }
     fn figures() -> Vec<String> {
-        vec![String::from("@"), String::from("X")]
+        vec![String::from("🟥"), String::from("🟨")]
     }
     fn draw(&self, _: &GameContext) -> String {
-        let mut grid = vec![vec![' '; 11]; 5];
+        let mut playing_field = String::new();
 
-        // vertical lines
-        for x in 0..2 {
-            let x = 3 + 4 * x;
-            for y in 0..5 {
-                grid[y][x] = '|';
+        for y in 0..3 {
+            for iy in 0..3 {
+                for x in 0..3 {
+                    let fig = Self::figures();
+
+                    let idx = flatten_xy(x, y);
+                    for ix in 0..3 {
+                        let sym = match self[idx] {
+                            Some(p) => &fig[p],
+                            None if ix == iy && ix == 1 => &NUMBERS[idx + 1],
+                            None => EMPTY,
+                        };
+                        playing_field += sym;
+                    }
+
+                    if x < 2 {
+                        playing_field += BORDER;
+                    } else {
+                        playing_field += "\n";
+                    }
+                }
+            }
+            if y < 2 {
+                for _ in 0..11 {
+                    playing_field += BORDER
+                }
+                playing_field += "\n";
             }
         }
 
-        // horizontal lines
-        for y in 0..2 {
-            let y = 1 + 2 * y;
-            for x in 0..11 {
-                grid[y][x] = if grid[y][x] == '|' { '+' } else { '-' };
-            }
-        }
-
-        for row in 0..3 {
-            for col in 0..3 {
-                let idx = flatten_xy(col, row);
-                let ch = match self[idx] {
-                    None => std::char::from_digit(1 + (3 * row + col) as u32, 10).unwrap(),
-                    Some(p) => ['@', 'X'][p],
-                };
-                grid[2 * row][1 + 4 * col] = ch;
-            }
-        }
-
-        // playing field string
-        let mut playing_field = String::from("```\n");
-        for line in grid.iter() {
-            playing_field += &format!("{}\n", line.iter().collect::<String>());
-        }
-        playing_field += "```";
         playing_field
     }
     fn ai() -> Option<Box<dyn AiPlayer<Self>>> {
