@@ -313,14 +313,27 @@ async fn leaderboard(ctx: &Context, msg: &Message) -> CommandResult {
         players
     };
 
-    let mut leaderboard = String::new();
+    let mut leaderboard = String::from("pos  pts  name\n");
 
-    for (user, elo) in players {
+    for (idx, (user, elo)) in players.into_iter().enumerate() {
+        let idx = idx + 1;
+        let suffix = match idx % 10 {
+            1 => "st",
+            2 => "nd",
+            3 => "rd",
+            _ => "th",
+        };
+
+        let rank = format!("{: >3}{}", idx, suffix);
+        let points = format!("{:0>4}", elo as i64);
+
         let user = match user.to_user(ctx).await {
             Ok(user) => user.mention().to_string(),
             Err(_) => String::from("<invalid user>"),
         };
-        let lb_entry = format!("{}:\t{}\n", user, elo as i64);
+
+        let lb_entry = format!("\u{200b}{} {} {}", rank, points, user);
+
         if leaderboard.len() + lb_entry.len() > 2000 {
             break;
         }
