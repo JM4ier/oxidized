@@ -5,6 +5,7 @@ use serenity::framework::standard::{macros::command, macros::*, CommandResult};
 use serenity::model::{channel::*, id::*, user::*};
 use serenity::prelude::*;
 use serenity::utils::Color;
+use std::time::*;
 
 mod mcts;
 mod minimax;
@@ -26,7 +27,14 @@ pub struct Games;
 #[usage = "<enemy_player>"]
 #[bucket("game")]
 async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
-    pvp_game(ctx, prompt, tictactoe::TTTField::default(), "tictactoe").await
+    pvp_game(
+        ctx,
+        prompt,
+        tictactoe::TTTField::default(),
+        "tictactoe",
+        60.0,
+    )
+    .await
 }
 
 #[command]
@@ -41,7 +49,7 @@ You win if you have three in a row, column or diagonal in the big field."
 #[usage = "<enemy_player>"]
 #[bucket("game")]
 async fn ultimate(ctx: &Context, prompt: &Message) -> CommandResult {
-    pvp_game(ctx, prompt, ultimate::UltimateGame::new(), "ultimate").await
+    pvp_game(ctx, prompt, ultimate::UltimateGame::new(), "ultimate", 60.0).await
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -109,6 +117,7 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
     prompt: &Message,
     mut game: G,
     game_name: &str,
+    timeout: f64,
 ) -> CommandResult {
     let cmds = commands();
     let cmd = cmds
@@ -171,6 +180,13 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
     }
 
     let mut game_ctx = GameContext { players, turn: 0 };
+    let mut time_left;
+
+    macro_rules! forfeit {
+        () => {
+            time_left == 0.0
+        };
+    };
 
     macro_rules! update_field {
         () => {
@@ -182,12 +198,19 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
                     }
                     e.field("Board", game.draw(&game_ctx), false);
                     let status = match game.status() {
+                        _ if forfeit!() => {
+                            format!("{} won by inactivity of {}.",
+                                game_ctx.players[1-game_ctx.turn].mention(),
+                                game_ctx.players[game_ctx.turn].mention(),
+                            )
+                        }
                         GameState::Win(p) => format!("{} won!", game_ctx.players[p].mention()),
                         GameState::Tie => String::from("It's a tie!"),
                         _ => format!(
-                            "{}({}) plays next.",
+                            "{}({}) plays next.\nTime left: {} seconds (updated every few seconds).",
                             game_ctx.players[game_ctx.turn].mention(),
-                            G::figures()[game_ctx.turn]
+                            G::figures()[game_ctx.turn],
+                            time_left as u64
                         ),
                     };
                     e.field("Status", status, false)
@@ -196,15 +219,28 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
         };
     };
 
-    loop {
-        update_field!();
+    'game: loop {
+        let before_move = Instant::now();
         let play = loop {
+            time_left = timeout - before_move.elapsed().as_secs_f64();
+            time_left = time_left.max(0.0);
+
+            update_field!();
+
             let is_ai_move = Some(game_ctx.turn) == ai_player_id;
+
+            if forfeit!() {
+                break 'game;
+            }
 
             let idx = if is_ai_move {
                 G::ai().unwrap().make_move(&game, ai_player_id.unwrap())
             } else {
-                let reaction = message.await_reaction(&ctx.shard).await;
+                let reaction = message
+                    .await_reaction(&ctx.shard)
+                    .timeout(Duration::from_secs_f64(10.0))
+                    .await;
+
                 let reaction = tryc!(reaction);
                 let reaction = reaction.as_inner_ref();
 
@@ -255,6 +291,7 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
 
         let result = match game.status() {
             GameState::Win(p) => (p as u8) + 1,
+            _ if forfeit!() => 2 - game_ctx.turn as u8,
             _ => 0,
         };
 
@@ -267,13 +304,14 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
         let score0 = match game.status() {
             GameState::Win(0) => 1.0,
             GameState::Win(1) => 0.0,
+            _ if forfeit!() => 1.0 - game_ctx.turn as f64,
             _ => 0.5,
         };
 
         const K: f64 = 40.0;
 
         // calculate elo addition/subtraction and clamp
-        let mut d_elo = K * (score0 - exp0);
+        let d_elo = K * (score0 - exp0);
 
         // update elo
         set_elo(server, players[0], game_name, elo[0] + d_elo)?;
