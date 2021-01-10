@@ -243,11 +243,12 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
     if compete {
         create_tables(game_name)?;
 
+        let server = *prompt.guild_id.ok_or("no server id")?.as_u64();
         let mut players = Vec::new();
         let mut elo = Vec::new();
         for p in 0..2 {
             players.push(*game_ctx.players[p].id.as_u64());
-            elo.push(get_elo(players[p], game_name)?);
+            elo.push(get_elo(server, players[p], game_name)?);
         }
 
         let result = match game.status() {
@@ -255,7 +256,7 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
             _ => 0,
         };
 
-        log_game(players[0], players[1], game_name, moves, result)?;
+        log_game(server, players[0], players[1], game_name, moves, result)?;
 
         // expected score for player 0
         let prob0 = 1.0 / (1.0 + 10.0_f64.powf((elo[0] - elo[1]) / 400.0));
@@ -276,8 +277,8 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
         }
 
         // update elo
-        set_elo(players[0], game_name, elo[0] + d_elo)?;
-        set_elo(players[1], game_name, elo[1] - d_elo)?;
+        set_elo(server, players[0], game_name, elo[0] + d_elo)?;
+        set_elo(server, players[1], game_name, elo[1] - d_elo)?;
     }
 
     Ok(())
@@ -339,49 +340,65 @@ async fn leaderboard(ctx: &Context, msg: &Message) -> CommandResult {
 
 type Elo = f64;
 
-fn get_elo(player: u64, game: &str) -> Result<Elo> {
+fn get_elo(server: u64, player: u64, game: &str) -> Result<Elo> {
     let player = format!("{}", player);
+    let server = format!("{}", server);
     let db = db()?;
     let elo: Elo = db
         .query_row(
-            &format!("SELECT elo FROM {} WHERE player = ?1", elo_table(game)),
-            params!(player),
+            &format!(
+                "SELECT elo FROM {} WHERE player = ?2 AND server = ?1",
+                elo_table(game)
+            ),
+            params!(server, player),
             |row| row.get(0),
         )
         .unwrap_or(1200.0);
     Ok(elo)
 }
 
-fn set_elo(player: u64, game: &str, elo: Elo) -> Result<()> {
+fn set_elo(server: u64, player: u64, game: &str, elo: Elo) -> Result<()> {
     let player = format!("{}", player);
+    let server = format!("{}", server);
 
     let db = db()?;
     let affected = db.execute(
-        &format!("UPDATE {} SET elo = ?2 WHERE player=?1;", elo_table(game)),
-        params!(player, elo),
+        &format!(
+            "UPDATE {} SET elo = ?3 WHERE player=?1 AND server=?2;",
+            elo_table(game)
+        ),
+        params!(player, server, elo),
     )?;
 
     if affected == 0 {
         db.execute(
             &format!(
-                "INSERT INTO {} (player, elo) VALUES (?1, ?2);",
+                "INSERT INTO {} (server, player, elo) VALUES (?1, ?2, ?3);",
                 elo_table(game)
             ),
-            params!(player, elo),
+            params!(server, player, elo),
         )?;
     }
     Ok(())
 }
 
-fn log_game(player1: u64, player2: u64, game: &str, moves: Vec<u8>, result: u8) -> Result<()> {
+fn log_game(
+    server: u64,
+    player1: u64,
+    player2: u64,
+    game: &str,
+    moves: Vec<u8>,
+    result: u8,
+) -> Result<()> {
     let player1 = format!("{}", player1);
     let player2 = format!("{}", player2);
+    let server = format!("{}", server);
     db()?.execute(
         &format!(
-            "INSERT INTO {} (player1, player2, moves, result) VALUES (?1, ?2, ?3, ?4);",
+            "INSERT INTO {} (server, player1, player2, moves, result) VALUES (?1, ?2, ?3, ?4, ?5);",
             games_table(game)
         ),
-        params!(player1, player2, &moves, result),
+        params!(server, player1, player2, &moves, result),
     )?;
     Ok(())
 }
@@ -396,12 +413,12 @@ fn elo_table(game: &str) -> String {
 
 fn create_tables(game: &str) -> Result<()> {
     db()?.execute(
-        &format!("CREATE TABLE IF NOT EXISTS {} (player1 TEXT, player2 TEXT, moves BLOB, result INTEGER);", games_table(game)),
+        &format!("CREATE TABLE IF NOT EXISTS {} (server TEXT, player1 TEXT, player2 TEXT, moves BLOB, result INTEGER);", games_table(game)),
         params!(),
     )?;
     db()?.execute(
         &format!(
-            "CREATE TABLE IF NOT EXISTS {} (player TEXT, elo REAL);",
+            "CREATE TABLE IF NOT EXISTS {} (server TEXT, player TEXT, elo REAL);",
             elo_table(game)
         ),
         params!(),
