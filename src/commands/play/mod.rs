@@ -115,6 +115,8 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
         .next()
         .unwrap();
 
+    create_tables(game_name)?;
+
     let mut moves = Vec::new();
 
     let mut players = prompt.mentions.clone();
@@ -241,8 +243,6 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
     update_field!();
 
     if compete {
-        create_tables(game_name)?;
-
         let server = *prompt.guild_id.ok_or("no server id")?.as_u64();
         let mut players = Vec::new();
         let mut elo = Vec::new();
@@ -259,10 +259,10 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
         log_game(server, players[0], players[1], game_name, moves, result)?;
 
         // expected score for player 0
-        let prob0 = 1.0 / (1.0 + 10.0_f64.powf((elo[0] - elo[1]) / 400.0));
+        let exp0 = 1.0 / (1.0 + 10.0_f64.powf((elo[1] - elo[0]) / 400.0));
 
         // actual score for player 0
-        let score = match game.status() {
+        let score0 = match game.status() {
             GameState::Win(0) => 1.0,
             GameState::Win(1) => 0.0,
             _ => 0.5,
@@ -271,7 +271,7 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
         const K: f64 = 40.0;
 
         // calculate elo addition/subtraction and clamp
-        let mut d_elo = K * (score - prob0);
+        let mut d_elo = K * (score0 - exp0);
 
         // update elo
         set_elo(server, players[0], game_name, elo[0] + d_elo)?;
