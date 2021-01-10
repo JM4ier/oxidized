@@ -125,6 +125,8 @@ async fn main() {
         .configure(|c| c.owners(owners).prefix(PREFIX))
         .on_dispatch_error(on_dispatch_error)
         .after(after)
+        .bucket("brainfuck", |b| b.time_span(10).limit(5))
+        .await
         .bucket("game", |b| b.time_span(60).limit(6))
         .await;
 

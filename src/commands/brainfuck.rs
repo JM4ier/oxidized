@@ -36,6 +36,7 @@ pub struct Brainfuck;
 #[description = "Executes a brainfuck program. See [here](https://esolangs.org/wiki/Brainfuck) for an introduction to the language."]
 #[usage = "<program> <input>"]
 #[example = ",[.,]. echo"]
+#[bucket("brainfuck")]
 async fn brainfuck(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let program = args.single::<String>()?;
@@ -262,6 +263,7 @@ pub async fn load(ctx: &Context, msg: &Message) -> CommandResult {
 #[description = "Loads a stored brainfuck program and runs it on an input given by you."]
 #[usage = "<name> <input>"]
 #[example = "reverse Hello, World!"]
+#[bucket("brainfuck")]
 pub async fn run(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let name = args.single::<String>()?;
