@@ -1,7 +1,8 @@
 use crate::{prelude::*, tryc};
 use lazy_static::*;
-use serenity::framework::standard::{macros::command, macros::*, CommandResult, *};
-use serenity::model::{channel::*, user::*};
+use rusqlite::{params, Result};
+use serenity::framework::standard::{macros::command, macros::*, CommandResult};
+use serenity::model::{channel::*, id::*, user::*};
 use serenity::prelude::*;
 use serenity::utils::Color;
 
@@ -10,14 +11,13 @@ mod minimax;
 mod random_ai;
 mod tictactoe;
 mod ultimate;
-use mcts::*;
 use minimax::*;
 use random_ai::*;
 
 #[group]
 #[help_available]
 #[prefix = "play"]
-#[commands(tictactoe, ultimate)]
+#[commands(tictactoe, ultimate, leaderboard)]
 pub struct Games;
 
 #[command]
@@ -106,14 +106,16 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
     ctx: &Context,
     prompt: &Message,
     mut game: G,
-    cmd: &str,
+    game_name: &str,
 ) -> CommandResult {
     let cmds = commands();
     let cmd = cmds
         .iter()
-        .filter(|c| c.options.names.contains(&cmd))
+        .filter(|c| c.options.names.contains(&game_name))
         .next()
         .unwrap();
+
+    let mut moves = Vec::new();
 
     let mut players = prompt.mentions.clone();
     players.push(prompt.author.clone());
@@ -136,6 +138,13 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
             ai_player_id = Some(i);
         }
     }
+
+    let compete = ai_player_id.is_none()
+        && players[0] != players[1]
+        && prompt
+            .args()
+            .single::<String>()
+            .map_or(true, |u| u != "casual");
 
     // check if the game even supports AI
     if ai_player_id.is_some() && G::ai().is_none() {
@@ -206,6 +215,7 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
 
             let state = game.make_move(idx, game_ctx.turn);
             if state != GameState::Invalid {
+                moves.push(idx as u8);
                 break state;
             }
 
@@ -228,8 +238,174 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
             game_ctx.next_turn();
         }
     }
-
     update_field!();
+
+    if compete {
+        create_tables(game_name)?;
+
+        let mut players = Vec::new();
+        let mut elo = Vec::new();
+        for p in 0..2 {
+            players.push(*game_ctx.players[p].id.as_u64());
+            elo.push(get_elo(players[p], game_name)?);
+        }
+
+        let result = match game.status() {
+            GameState::Win(p) => (p as u8) + 1,
+            _ => 0,
+        };
+
+        log_game(players[0], players[1], game_name, moves, result)?;
+
+        // expected score for player 0
+        let prob0 = 1.0 / (1.0 + 10.0_f64.powf((elo[0] - elo[1]) / 400.0));
+
+        // actual score for player 0
+        let score = match game.status() {
+            GameState::Win(0) => 1.0,
+            GameState::Win(1) => 0.0,
+            _ => 0.5,
+        };
+
+        // calculate elo addition/subtraction and clamp
+        let mut d_elo = 40.0 * (score - prob0);
+        if elo[0] + d_elo < 0.0 {
+            d_elo = -elo[0];
+        } else if elo[1] - d_elo < 0.0 {
+            d_elo = elo[1];
+        }
+
+        // update elo
+        set_elo(players[0], game_name, elo[0] + d_elo)?;
+        set_elo(players[1], game_name, elo[1] - d_elo)?;
+    }
+
+    Ok(())
+}
+
+#[command]
+async fn leaderboard(ctx: &Context, msg: &Message) -> CommandResult {
+    let mut args = msg.args();
+    let game = args.single::<String>()?;
+
+    if game.chars().any(|c| !c.is_ascii_alphabetic()) {
+        Err("sqli")?;
+    }
+
+    let players = {
+        let db = db()?;
+        let mut stmt = db.prepare("SELECT player, elo FROM ?1")?;
+        let players_iter = stmt.query_map(params!(game), |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+        })?;
+
+        let mut players = Vec::new();
+        for entry in players_iter {
+            let (player, elo) = tryc!(entry.ok());
+            let player = UserId(player.parse::<u64>().unwrap());
+            players.push((player, elo));
+        }
+
+        players.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        players
+    };
+
+    let mut leaderboard = String::new();
+
+    for (user, elo) in players {
+        let user = match user.to_user(ctx).await {
+            Ok(user) => user.mention().to_string(),
+            Err(_) => String::from("<invalid user>"),
+        };
+        let lb_entry = format!("{}:\t{}\n", user, elo as i64);
+        if leaderboard.len() + lb_entry.len() > 2000 {
+            break;
+        }
+        leaderboard += &lb_entry;
+    }
+
+    if leaderboard.len() == 0 {
+        leaderboard += "This leaderboard is empty.";
+    }
+
+    msg.ereply(ctx, |e| {
+        e.title(format!("{} Leaderboard", game));
+        e.description(leaderboard)
+    })
+    .await?;
+
+    Ok(())
+}
+
+type Elo = f64;
+
+fn get_elo(player: u64, game: &str) -> Result<Elo> {
+    let player = format!("{}", player);
+    let db = db()?;
+    let elo: Elo = db
+        .query_row(
+            &format!("SELECT elo FROM {} WHERE player = ?1", elo_table(game)),
+            params!(player),
+            |row| row.get(0),
+        )
+        .unwrap_or(1200.0);
+    Ok(elo)
+}
+
+fn set_elo(player: u64, game: &str, elo: Elo) -> Result<()> {
+    let player = format!("{}", player);
+
+    let db = db()?;
+    let affected = db.execute(
+        &format!("UPDATE {} SET elo = ?2 WHERE player=?1;", elo_table(game)),
+        params!(player, elo),
+    )?;
+
+    if affected == 0 {
+        db.execute(
+            &format!(
+                "INSERT INTO {} (player, elo) VALUES (?1, ?2);",
+                elo_table(game)
+            ),
+            params!(player, elo),
+        )?;
+    }
+    Ok(())
+}
+
+fn log_game(player1: u64, player2: u64, game: &str, moves: Vec<u8>, result: u8) -> Result<()> {
+    let player1 = format!("{}", player1);
+    let player2 = format!("{}", player2);
+    db()?.execute(
+        &format!(
+            "INSERT INTO {} (player1, player2, moves, result) VALUES (?1, ?2, ?3, ?4);",
+            games_table(game)
+        ),
+        params!(player1, player2, &moves, result),
+    )?;
+    Ok(())
+}
+
+fn games_table(game: &str) -> String {
+    format!("{}_games", game)
+}
+
+fn elo_table(game: &str) -> String {
+    format!("{}_elo", game)
+}
+
+fn create_tables(game: &str) -> Result<()> {
+    db()?.execute(
+        &format!("CREATE TABLE IF NOT EXISTS {} (player1 TEXT, player2 TEXT, moves BLOB, result INTEGER);", games_table(game)),
+        params!(),
+    )?;
+    db()?.execute(
+        &format!(
+            "CREATE TABLE IF NOT EXISTS {} (player TEXT, elo REAL);",
+            elo_table(game)
+        ),
+        params!(),
+    )?;
     Ok(())
 }
 
