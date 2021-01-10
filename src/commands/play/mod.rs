@@ -268,13 +268,10 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
             _ => 0.5,
         };
 
+        const K: f64 = 40.0;
+
         // calculate elo addition/subtraction and clamp
-        let mut d_elo = 40.0 * (score - prob0);
-        if elo[0] + d_elo < 0.0 {
-            d_elo = -elo[0];
-        } else if elo[1] - d_elo < 0.0 {
-            d_elo = elo[1];
-        }
+        let mut d_elo = K * (score - prob0);
 
         // update elo
         set_elo(server, players[0], game_name, elo[0] + d_elo)?;
@@ -293,10 +290,15 @@ async fn leaderboard(ctx: &Context, msg: &Message) -> CommandResult {
         Err("sqli")?;
     }
 
+    let server = format!("{}", msg.guild_id.ok_or("not sent in a guild")?);
+
     let players = {
         let db = db()?;
-        let mut stmt = db.prepare(&format!("SELECT player, elo FROM {}", elo_table(&game)))?;
-        let players_iter = stmt.query_map(params!(), |row| {
+        let mut stmt = db.prepare(&format!(
+            "SELECT player, elo FROM {} WHERE server=?1",
+            elo_table(&game)
+        ))?;
+        let players_iter = stmt.query_map(params!(server), |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
         })?;
 
