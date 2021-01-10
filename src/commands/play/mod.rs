@@ -294,8 +294,8 @@ async fn leaderboard(ctx: &Context, msg: &Message) -> CommandResult {
 
     let players = {
         let db = db()?;
-        let mut stmt = db.prepare("SELECT player, elo FROM ?1")?;
-        let players_iter = stmt.query_map(params!(game), |row| {
+        let mut stmt = db.prepare(&format!("SELECT player, elo FROM {}", elo_table(&game)))?;
+        let players_iter = stmt.query_map(params!(), |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
         })?;
 
