@@ -171,12 +171,60 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
         return Ok(());
     }
 
+    if ai_player_id.is_none() {
+        let challenger = prompt.author.mention();
+        let challengee_id = &players[0];
+        let challengee = challengee_id.mention();
+
+        let mode = match compete {
+            true => "",
+            false => "casual ",
+        };
+
+        let confirm = prompt
+            .ereply(ctx, |e| {
+                e.title("Game Invite");
+                e.description(format!(
+                    "{}, you have been invited by {} to play a {} game of {}.\nTo start the game, confirm this with a reaction within ten seconds.",
+                    challengee, challenger, mode, game_name
+                ))
+            })
+            .await?;
+        confirm
+            .react(ctx, ReactionType::Unicode(String::from("⬆️")))
+            .await?;
+
+        let begin = Instant::now();
+
+        let confirmed = loop {
+            let elapsed = begin.elapsed().as_secs_f64();
+            if elapsed >= 10.0 {
+                break false;
+            }
+            let reaction = confirm
+                .await_reaction(ctx)
+                .timeout(Duration::from_secs_f64(10.0 - elapsed))
+                .await;
+            let reaction = tryc!(reaction);
+            let reaction = reaction.as_inner_ref();
+            if reaction.user_id == Some(challengee_id.id) {
+                break true;
+            }
+        };
+
+        confirm.delete(ctx).await?;
+
+        if !confirmed {
+            return Ok(());
+        }
+    }
+
     // create message and react
     let mut message = prompt
         .ereply(ctx, |e| e.title(G::title()).description("Loading game..."))
         .await?;
     for r in G::reactions() {
-        message.react(&ctx.http, r).await?;
+        message.react(ctx, r).await?;
     }
 
     let mut game_ctx = GameContext { players, turn: 0 };
@@ -302,9 +350,8 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
 
         // actual score for player 0
         let score0 = match game.status() {
-            GameState::Win(0) => 1.0,
-            GameState::Win(1) => 0.0,
-            _ if forfeit!() => 1.0 - game_ctx.turn as f64,
+            GameState::Win(p) => 1.0 - p as f64,
+            _ if forfeit!() => game_ctx.turn as f64,
             _ => 0.5,
         };
 
