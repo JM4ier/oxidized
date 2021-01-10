@@ -24,6 +24,7 @@ pub struct Games;
 #[only_in(guilds)]
 #[description("The classic 3x3 game without strategy.")]
 #[usage = "<enemy_player>"]
+#[bucket("game")]
 async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
     pvp_game(ctx, prompt, tictactoe::TTTField::default(), "tictactoe").await
 }
@@ -38,6 +39,7 @@ A win in a small field counts as a mark on the big field.
 You win if you have three in a row, column or diagonal in the big field."
 )]
 #[usage = "<enemy_player>"]
+#[bucket("game")]
 async fn ultimate(ctx: &Context, prompt: &Message) -> CommandResult {
     pvp_game(ctx, prompt, ultimate::UltimateGame::new(), "ultimate").await
 }

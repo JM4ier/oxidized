@@ -124,7 +124,9 @@ async fn main() {
         .help(&HELP)
         .configure(|c| c.owners(owners).prefix(PREFIX))
         .on_dispatch_error(on_dispatch_error)
-        .after(after);
+        .after(after)
+        .bucket("game", |b| b.time_span(60).limit(6))
+        .await;
 
     for group in command_groups() {
         framework = framework.group(group);
