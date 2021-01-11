@@ -23,8 +23,10 @@ impl PvpGame for UltimateGame {
     fn status(&self) -> GameState {
         let mut wins = [None; 9];
         for i in 0..9 {
-            if let GameState::Win(p) = self.field[i].status() {
-                wins[i] = Some(p);
+            wins[i] = match self.field[i].status() {
+                GameState::Win(p) => Some(p),
+                GameState::Tie => Some(42),
+                _ => None,
             }
         }
         wins.status()
