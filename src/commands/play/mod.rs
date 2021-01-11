@@ -15,41 +15,71 @@ mod ultimate;
 use minimax::*;
 use random_ai::*;
 
-#[group]
-#[help_available]
-#[prefix = "play"]
-#[commands(tictactoe, ultimate, leaderboard)]
-pub struct Games;
+macro_rules! make_games {
+    ($($(#[$meta:meta])* game $name:ident ($struct:expr, $timeout:expr); )*) => {
+        mod game {
+            use super::*;
+            $(
+                #[command]
+                #[only_in(guilds)]
+                #[bucket("game")]
+                #[usage = "[casual] <enemy_player>"]
+                $(
+                    #[$meta]
+                )*
+                async fn $name(ctx: &Context, prompt: &Message) -> CommandResult {
+                    pvp_game(ctx, prompt, $struct, stringify!($name), $timeout as f64).await
+                }
+            )*
 
-#[command]
-#[only_in(guilds)]
-#[description("The classic 3x3 game without strategy.")]
-#[usage = "<enemy_player>"]
-#[bucket("game")]
-async fn tictactoe(ctx: &Context, prompt: &Message) -> CommandResult {
-    pvp_game(
-        ctx,
-        prompt,
-        tictactoe::TTTField::default(),
-        "tictactoe",
-        60.0,
-    )
-    .await
+            #[group]
+            #[help_available]
+            #[prefix = "play"]
+            #[commands($(
+                $name
+            ),*)]
+            #[allow(unused)]
+            pub struct Games;
+
+        }
+
+        mod score {
+            use super::*;
+            $(
+                #[command]
+                #[only_in(guilds)]
+                async fn $name(ctx: &Context, msg: &Message) -> CommandResult {
+                    leaderboard(ctx, msg, stringify!($name)).await
+                }
+            )*
+
+            #[group]
+            #[help_available]
+            #[prefix = "leaderboard"]
+            #[commands($(
+                $name
+            ),*)]
+            #[allow(unused)]
+            pub struct Leaderboard;
+        }
+
+        pub use game::GAMES_GROUP;
+        pub use score::LEADERBOARD_GROUP;
+    };
 }
 
-#[command]
-#[only_in(guilds)]
-#[description(
-    "You play on a 3x3 grid of tictactoe fields.
+make_games! {
+    #[description("The classic 3x3 game without strategy.")]
+    game tictactoe (tictactoe::TTTField::default(), 60.0);
+
+    #[description(
+        "You play on a 3x3 grid of tictactoe fields.
 Where you move in the small field determines which field your opponent is going to play in next.
 If that targeted field is already occupied (won/lost/tied), the field with the next bigger index is chosen.
 A win in a small field counts as a mark on the big field.
 You win if you have three in a row, column or diagonal in the big field."
-)]
-#[usage = "<enemy_player>"]
-#[bucket("game")]
-async fn ultimate(ctx: &Context, prompt: &Message) -> CommandResult {
-    pvp_game(ctx, prompt, ultimate::UltimateGame::new(), "ultimate", 60.0).await
+    )]
+    game ultimate(ultimate::UltimateGame::new(), 60.0);
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -368,15 +398,7 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
     Ok(())
 }
 
-#[command]
-async fn leaderboard(ctx: &Context, msg: &Message) -> CommandResult {
-    let mut args = msg.args();
-    let game = args.single::<String>()?;
-
-    if game.chars().any(|c| !c.is_ascii_alphabetic()) {
-        Err("sqli")?;
-    }
-
+async fn leaderboard(ctx: &Context, msg: &Message, game: &str) -> CommandResult {
     let server = format!("{}", msg.guild_id.ok_or("not sent in a guild")?);
 
     let players = {
@@ -405,6 +427,7 @@ async fn leaderboard(ctx: &Context, msg: &Message) -> CommandResult {
     for (idx, (user, elo)) in players.into_iter().enumerate() {
         let idx = idx + 1;
         let suffix = match idx % 10 {
+            _ if (idx / 10) % 10 == 1 => "th",
             1 => "st",
             2 => "nd",
             3 => "rd",

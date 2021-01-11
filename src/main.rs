@@ -4,7 +4,7 @@ extern crate lazy_static;
 mod commands;
 mod prelude;
 
-use commands::{brainfuck::*, easteregg::*, meta::*, owner::*, play::*, util::*};
+use commands::{brainfuck::*, easteregg::*, meta::*, owner::*, util::*};
 use prelude::*;
 use serenity::{
     async_trait,
@@ -84,10 +84,12 @@ pub async fn after(ctx: &Context, msg: &Message, _: &str, err: Result<(), Comman
 struct General;
 
 pub fn command_groups() -> Vec<&'static CommandGroup> {
+    use crate::commands::play::*;
     vec![
         &GENERAL_GROUP,
         &MANAGEMENT_GROUP,
         &GAMES_GROUP,
+        &LEADERBOARD_GROUP,
         &BRAINFUCK_GROUP,
     ]
 }
