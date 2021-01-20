@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use rand::prelude::*;
 use rand::seq::SliceRandom;
 use serenity::framework::standard::{macros::command, CommandResult};
 use serenity::model::prelude::*;
@@ -28,5 +29,18 @@ async fn random(ctx: &Context, msg: &Message) -> CommandResult {
     })
     .await?;
 
+    Ok(())
+}
+
+#[command("trackme")]
+#[description = "Definitely tracks your IP location from your discord username"]
+async fn track(ctx: &Context, msg: &Message) -> CommandResult {
+    let url = {
+        let mut rng = thread_rng();
+        let x = rng.gen::<f32>() * 40.0;
+        let y = rng.gen::<f32>() * 40.0;
+        format!("<https://www.google.com/maps/@{:.7}:{:.7},11z>", x, y)
+    };
+    msg.author.dm(ctx, |f| f.content(url)).await?;
     Ok(())
 }
