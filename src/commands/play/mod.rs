@@ -7,6 +7,7 @@ use serenity::prelude::*;
 use serenity::utils::Color;
 use std::time::*;
 
+mod connect4;
 mod mcts;
 mod minimax;
 mod random_ai;
@@ -49,7 +50,8 @@ macro_rules! make_games {
                 #[command]
                 #[only_in(guilds)]
                 async fn $name(ctx: &Context, msg: &Message) -> CommandResult {
-                    leaderboard(ctx, msg, stringify!($name)).await
+                    fn title<G: PvpGame>(_: &G) -> &'static str { G::title() }
+                    leaderboard(ctx, msg, stringify!($name), title(&$struct)).await
                 }
             )*
 
@@ -80,6 +82,10 @@ A win in a small field counts as a mark on the big field.
 You win if you have three in a row, column or diagonal in the big field."
     )]
     game ultimate(ultimate::UltimateGame::new(), 60.0);
+
+    #[description("The classic Connect Four game.
+A person wins if four discs of the same color are arranged in a row, column, or diagonal.")]
+    game connect4(connect4::Connect4::default(), 60.0);
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -398,7 +404,7 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
     Ok(())
 }
 
-async fn leaderboard(ctx: &Context, msg: &Message, game: &str) -> CommandResult {
+async fn leaderboard(ctx: &Context, msg: &Message, game: &str, game_name: &str) -> CommandResult {
     let server = format!("{}", msg.guild_id.ok_or("not sent in a guild")?);
 
     let players = {
@@ -442,7 +448,7 @@ async fn leaderboard(ctx: &Context, msg: &Message, game: &str) -> CommandResult 
             Err(_) => String::from("<invalid user>"),
         };
 
-        let lb_entry = format!("\u{200b}{} {} {}\n", rank, points, user);
+        let lb_entry = format!("\u{200b}`{} {}` {}\n", rank, points, user);
 
         if leaderboard.len() + lb_entry.len() > 2000 {
             break;
@@ -455,7 +461,7 @@ async fn leaderboard(ctx: &Context, msg: &Message, game: &str) -> CommandResult 
     }
 
     msg.ereply(ctx, |e| {
-        e.title(format!("{} Leaderboard", game));
+        e.title(format!("{} Leaderboard", game_name));
         e.description(leaderboard)
     })
     .await?;
