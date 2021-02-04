@@ -448,7 +448,7 @@ async fn leaderboard(ctx: &Context, msg: &Message, game: &str, game_name: &str) 
             Err(_) => String::from("<invalid user>"),
         };
 
-        let lb_entry = format!("\u{200b}`{} {}` {}\n", rank, points, user);
+        let lb_entry = format!("\u{200b}`{} {}  ` {}\n", rank, points, user);
 
         if leaderboard.len() + lb_entry.len() > 2000 {
             break;
