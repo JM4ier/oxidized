@@ -103,8 +103,6 @@ impl EmbedReply for Message {
     {
         self.channel_id
             .send_message(ctx, |m| {
-                m.reference_message(self);
-                m.allowed_mentions(|f| f.replied_user(true));
                 m.embed(|e| {
                     embed_template(self, e);
                     fun(e)
