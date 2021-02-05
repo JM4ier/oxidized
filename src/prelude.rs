@@ -72,6 +72,30 @@ impl MessageArgs for Message {
     }
 }
 
+/// concatenates a list of strings into larger strings, while respecting the maximum length of an
+/// embed field.
+///
+/// Note: Strings must not be longer than 2000 characters.
+pub fn split_into_fields(parts: &[String], default: &str) -> Vec<String> {
+    const LIMIT: usize = 2000;
+    let mut fields = Vec::new();
+    let mut field = String::new();
+    for part in parts.iter() {
+        if field.len() + part.len() > LIMIT {
+            fields.push(field);
+            field = String::new();
+        }
+        field += part;
+    }
+    if field.len() > 0 {
+        fields.push(field);
+    }
+    if fields.len() == 0 {
+        fields.push(default.into());
+    }
+    fields
+}
+
 fn embed_template<'u, 'c: 'u>(msg: &'u Message, e: &'c mut CreateEmbed) -> &'c mut CreateEmbed {
     let author = &msg.author;
 

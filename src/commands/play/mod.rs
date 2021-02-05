@@ -8,6 +8,7 @@ use serenity::utils::Color;
 use std::time::*;
 
 mod connect4;
+mod elo;
 mod mcts;
 mod minimax;
 mod random_ai;
@@ -362,43 +363,25 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
             game_ctx.next_turn();
         }
     }
+
     update_field!();
 
     if compete {
+        let winner = match game.status() {
+            GameState::Win(p) => Some(p),
+            _ if forfeit!() => Some(1 - game_ctx.turn),
+            _ => None,
+        };
+
         let server = *prompt.guild_id.ok_or("no server id")?.as_u64();
-        let mut players = Vec::new();
-        let mut elo = Vec::new();
-        for p in 0..2 {
-            players.push(*game_ctx.players[p].id.as_u64());
-            elo.push(get_elo(server, players[p], game_name)?);
-        }
+        let players = game_ctx
+            .players
+            .iter()
+            .map(|p| *p.id.as_u64())
+            .collect::<Vec<u64>>();
 
-        let result = match game.status() {
-            GameState::Win(p) => (p as u8) + 1,
-            _ if forfeit!() => 2 - game_ctx.turn as u8,
-            _ => 0,
-        };
-
-        log_game(server, players[0], players[1], game_name, moves, result)?;
-
-        // expected score for player 0
-        let exp0 = 1.0 / (1.0 + 10.0_f64.powf((elo[1] - elo[0]) / 400.0));
-
-        // actual score for player 0
-        let score0 = match game.status() {
-            GameState::Win(p) => 1.0 - p as f64,
-            _ if forfeit!() => game_ctx.turn as f64,
-            _ => 0.5,
-        };
-
-        const K: f64 = 40.0;
-
-        // calculate elo addition/subtraction and clamp
-        let d_elo = K * (score0 - exp0);
-
-        // update elo
-        set_elo(server, players[0], game_name, elo[0] + d_elo)?;
-        set_elo(server, players[1], game_name, elo[1] - d_elo)?;
+        log_game(game_name, server, &players, moves, winner)?;
+        elo::process_game(game_name, server, &players, winner)?;
     }
 
     Ok(())
@@ -428,19 +411,10 @@ async fn leaderboard(ctx: &Context, msg: &Message, game: &str, game_name: &str) 
         players
     };
 
-    let mut leaderboard = String::new();
+    let mut leaderboard = Vec::new();
 
     for (idx, (user, elo)) in players.into_iter().enumerate() {
-        let idx = idx + 1;
-        let suffix = match idx % 10 {
-            _ if (idx / 10) % 10 == 1 => "th",
-            1 => "st",
-            2 => "nd",
-            3 => "rd",
-            _ => "th",
-        };
-
-        let rank = format!("{: >3}{}", idx, suffix);
+        let rank = rank_string(idx + 1);
         let points = format!("{:0>4}", elo as i64);
 
         let user = match user.to_user(ctx).await {
@@ -448,82 +422,42 @@ async fn leaderboard(ctx: &Context, msg: &Message, game: &str, game_name: &str) 
             Err(_) => String::from("<invalid user>"),
         };
 
-        let lb_entry = format!("\u{200b}`{} {}  ` {}\n", rank, points, user);
-
-        if leaderboard.len() + lb_entry.len() > 2000 {
-            break;
-        }
-        leaderboard += &lb_entry;
+        leaderboard.push(format!("`{} {}  ` {}\n", rank, points, user));
     }
 
-    if leaderboard.len() == 0 {
-        leaderboard += "This leaderboard is empty.";
-    }
+    let leaderboard = split_into_fields(&leaderboard, "This leaderboard is empty");
 
     msg.ereply(ctx, |e| {
         e.title(format!("{} Leaderboard", game_name));
-        e.description(leaderboard)
+        e.description(&leaderboard[0])
     })
     .await?;
 
     Ok(())
 }
 
-type Elo = f64;
-
-fn get_elo(server: u64, player: u64, game: &str) -> Result<Elo> {
-    let player = format!("{}", player);
-    let server = format!("{}", server);
-    let db = db()?;
-    let elo: Elo = db
-        .query_row(
-            &format!(
-                "SELECT elo FROM {} WHERE player = ?2 AND server = ?1",
-                elo_table(game)
-            ),
-            params!(server, player),
-            |row| row.get(0),
-        )
-        .unwrap_or(1200.0);
-    Ok(elo)
-}
-
-fn set_elo(server: u64, player: u64, game: &str, elo: Elo) -> Result<()> {
-    let player = format!("{}", player);
-    let server = format!("{}", server);
-
-    let db = db()?;
-    let affected = db.execute(
-        &format!(
-            "UPDATE {} SET elo = ?3 WHERE player=?1 AND server=?2;",
-            elo_table(game)
-        ),
-        params!(player, server, elo),
-    )?;
-
-    if affected == 0 {
-        db.execute(
-            &format!(
-                "INSERT INTO {} (server, player, elo) VALUES (?1, ?2, ?3);",
-                elo_table(game)
-            ),
-            params!(server, player, elo),
-        )?;
-    }
-    Ok(())
+fn rank_string(rank: usize) -> String {
+    let suffix = match rank % 10 {
+        _ if (rank / 10) % 10 == 1 => "th",
+        1 => "st",
+        2 => "nd",
+        3 => "rd",
+        _ => "th",
+    };
+    format!("{: >3}{}", rank, suffix)
 }
 
 fn log_game(
-    server: u64,
-    player1: u64,
-    player2: u64,
     game: &str,
+    server: u64,
+    player_id: &[u64],
     moves: Vec<u8>,
-    result: u8,
+    winner: Option<usize>,
 ) -> Result<()> {
-    let player1 = format!("{}", player1);
-    let player2 = format!("{}", player2);
+    let player1 = format!("{}", player_id[0]);
+    let player2 = format!("{}", player_id[1]);
     let server = format!("{}", server);
+    let result = winner.map_or(0, |win| win as u8 + 1);
     db()?.execute(
         &format!(
             "INSERT INTO {} (server, player1, player2, moves, result) VALUES (?1, ?2, ?3, ?4, ?5);",

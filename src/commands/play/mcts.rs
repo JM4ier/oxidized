@@ -4,7 +4,6 @@ use super::*;
 use rand::prelude::*;
 use std::marker::*;
 use std::ops::*;
-use std::time::*;
 
 pub const VALUE_WEIGHT: f64 = 0.5;
 pub const EXPLORE: f64 = 0.5;
