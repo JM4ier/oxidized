@@ -1,10 +1,7 @@
+use crate::ser::*;
 use crate::{prelude::*, tryc};
 use lazy_static::*;
 use rusqlite::{params, Result};
-use serenity::framework::standard::{macros::command, macros::*, CommandResult};
-use serenity::model::{channel::*, id::*, user::*};
-use serenity::prelude::*;
-use serenity::utils::Color;
 use std::time::*;
 
 mod connect4;
@@ -189,13 +186,6 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
         }
     }
 
-    let compete = ai_player_id.is_none()
-        && players[0] != players[1]
-        && prompt
-            .args()
-            .single::<String>()
-            .map_or(true, |u| u != "casual");
-
     // check if the game even supports AI
     if ai_player_id.is_some() && G::ai().is_none() {
         prompt
@@ -208,6 +198,15 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
         return Ok(());
     }
 
+    // see if this is meant to be played competitively, default to true if no argument
+    let compete = ai_player_id.is_none()
+        && players[0] != players[1]
+        && prompt
+            .args()
+            .single::<String>()
+            .map_or(true, |u| u != "casual");
+
+    // create a prompt to see if the challenged person wants to play
     if ai_player_id.is_none() {
         let challenger = prompt.author.mention();
         let challengee_id = &players[0];
@@ -218,40 +217,23 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
             false => "casual ",
         };
 
-        let confirm = prompt
-            .ereply(ctx, |e| {
-                e.title("Game Invite");
-                e.description(format!(
-                    "{}, you have been invited by {} to play a {} game of {}.\nTo start the game, confirm this with a reaction within ten seconds.",
-                    challengee, challenger, mode, game_name
-                ))
-            })
-            .await?;
-        confirm
-            .react(ctx, ReactionType::Unicode(String::from("⬆️")))
-            .await?;
+        let confirm = confirm_dialog(
+            ctx,
+            prompt,
+            "Game Invite",
+            &format!(
+                "{}, you have been invited by {} to play a {} game of {}.
+                To start the game, confirm this with a reaction within ten seconds.",
+                challengee,
+                challenger,
+                mode,
+                G::title()
+            ),
+            &challengee_id,
+        )
+        .await?;
 
-        let begin = Instant::now();
-
-        let confirmed = loop {
-            let elapsed = begin.elapsed().as_secs_f64();
-            if elapsed >= 10.0 {
-                break false;
-            }
-            let reaction = confirm
-                .await_reaction(ctx)
-                .timeout(Duration::from_secs_f64(10.0 - elapsed))
-                .await;
-            let reaction = tryc!(reaction);
-            let reaction = reaction.as_inner_ref();
-            if reaction.user_id == Some(challengee_id.id) {
-                break true;
-            }
-        };
-
-        confirm.delete(ctx).await?;
-
-        if !confirmed {
+        if !confirm {
             return Ok(());
         }
     }
@@ -300,8 +282,8 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
                     };
                     e.field("Status", status, false)
                 })
-                .await?;
-        };
+            .await?;
+            };
     };
 
     'game: loop {

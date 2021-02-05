@@ -1,13 +1,6 @@
 use crate::prelude::*;
+use crate::ser::*;
 use crate::ShardManagerContainer;
-use serenity::{
-    framework::standard::{
-        macros::{command, *},
-        *,
-    },
-    model::prelude::*,
-    prelude::*,
-};
 use std::fs::File;
 use std::io::Read;
 

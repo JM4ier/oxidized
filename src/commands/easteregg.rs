@@ -1,7 +1,5 @@
 use crate::prelude::*;
-use serenity::framework::standard::{macros::command, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
+use crate::ser::*;
 
 #[command]
 async fn solution(ctx: &Context, msg: &Message) -> CommandResult {

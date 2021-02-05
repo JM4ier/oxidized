@@ -3,17 +3,12 @@ extern crate lazy_static;
 
 mod commands;
 mod prelude;
+mod ser;
+mod util;
 
+use crate::ser::*;
 use commands::{brainfuck::*, easteregg::*, meta::*, owner::*, util::*};
 use prelude::*;
-use serenity::{
-    async_trait,
-    client::bridge::gateway::ShardManager,
-    framework::{standard::macros::*, standard::*, StandardFramework},
-    http::Http,
-    model::{channel::*, event::ResumedEvent, gateway::*, id::*},
-    prelude::*,
-};
 use std::{collections::HashSet, env, sync::Arc};
 use tracing::*;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};

@@ -1,10 +1,7 @@
 use crate::prelude::*;
+use crate::ser::*;
 use rand::prelude::*;
 use rand::seq::SliceRandom;
-use serenity::framework::standard::{macros::command, CommandResult};
-use serenity::model::prelude::*;
-use serenity::prelude::*;
-use serenity::utils::*;
 
 #[command]
 #[min_args(1)]
