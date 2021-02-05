@@ -46,31 +46,32 @@ async fn help(
     groups: &[&'static CommandGroup],
     owners: HashSet<UserId>,
 ) -> CommandResult {
-    let _ = help_commands::with_embeds(context, msg, args, help_options, groups, owners).await;
+    help_commands::with_embeds(context, msg, args, help_options, groups, owners).await;
     Ok(())
 }
 
 #[hook]
 pub async fn on_dispatch_error(ctx: &Context, msg: &Message, _: DispatchError) {
-    let _ = msg
-        .react(ctx, ReactionType::Unicode(String::from("🤡")))
-        .await;
+    let clown = ReactionType::Unicode("🤡".into());
+    msg.react(ctx, clown).await.ok();
 }
 
 #[hook]
 pub async fn after(ctx: &Context, msg: &Message, _: &str, err: Result<(), CommandError>) {
-    let reaction = if let Err(_) = err { "🤦" } else { "👌" };
-    let _ = msg
-        .react(ctx, ReactionType::Unicode(String::from(reaction)))
-        .await;
-    if let Err(err) = err {
-        event!(
-            tracing::Level::INFO,
-            r#"Message "{}" caused "{}""#,
-            msg.content,
-            err
-        );
-    }
+    let reaction = match err {
+        Err(err) => {
+            event!(
+                tracing::Level::INFO,
+                r#"Message "{}" caused "{}""#,
+                msg.content,
+                err
+            );
+            "🤦"
+        }
+        Ok(_) => "👌",
+    };
+    let reaction = ReactionType::Unicode(reaction.into());
+    msg.react(ctx, reaction).await.ok();
 }
 
 #[group]
