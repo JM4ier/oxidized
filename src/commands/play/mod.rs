@@ -289,35 +289,32 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
     'game: loop {
         let before_move = Instant::now();
         let play = loop {
-            time_left = timeout - before_move.elapsed().as_secs_f64();
-            time_left = time_left.max(0.0);
+            time_left = (timeout - before_move.elapsed().as_secs_f64()).max(0.0);
 
             update_field!();
-
-            let is_ai_move = Some(game_ctx.turn) == ai_player_id;
 
             if forfeit!() {
                 break 'game;
             }
+
+            let is_ai_move = Some(game_ctx.turn) == ai_player_id;
 
             let idx = if is_ai_move {
                 G::ai().unwrap().make_move(&game, ai_player_id.unwrap())
             } else {
                 let reaction = message
                     .await_reaction(&ctx.shard)
+                    .author_id(game_ctx.players[game_ctx.turn].id)
+                    .removed(true)
                     .timeout(Duration::from_secs_f64(10.0))
                     .await;
 
                 let reaction = tryc!(reaction);
-                let reaction = reaction.as_inner_ref();
-
-                // check player who has reacted
-                if Some(game_ctx.players[game_ctx.turn].id) != reaction.user_id {
-                    continue;
-                }
 
                 // if it is one of the given emojis, try to make that move
-                tryc!(G::reactions().into_iter().position(|e| e == reaction.emoji))
+                tryc!(G::reactions()
+                    .into_iter()
+                    .position(|e| e == reaction.as_inner_ref().emoji))
             };
 
             let state = game.make_move(idx, game_ctx.turn);
@@ -326,14 +323,16 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
                 break state;
             }
 
-            // ai made an invalid move
             if is_ai_move {
-                let reply = format!(
-                    "The AI for this game sucks and tries to do invalid moves, {} pls fix.",
-                    DISCORD_AUTHOR
-                );
+                // AI is the one that made the invalid move
                 message
-                    .ereply(ctx, |e| e.title("Programming error").description(reply))
+                    .ereply(ctx, |e| {
+                        e.title("Programming error");
+                        e.description(format!(
+                            "The AI for this game sucks and tries to do invalid moves, {} pls fix.",
+                            DISCORD_AUTHOR
+                        ))
+                    })
                     .await?;
                 return Ok(());
             }
