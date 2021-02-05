@@ -119,7 +119,7 @@ async fn main() {
     // Create the framework
     let mut framework = StandardFramework::new()
         .help(&HELP)
-        .configure(|c| c.owners(owners).prefix(PREFIX))
+        .configure(|c| c.owners(owners).prefix(&PREFIX))
         .on_dispatch_error(on_dispatch_error)
         .after(after)
         .bucket("brainfuck", |b| b.time_span(10).limit(5))

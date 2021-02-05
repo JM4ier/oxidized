@@ -25,7 +25,7 @@ async fn info(ctx: &Context, msg: &Message) -> CommandResult {
         e.title(format!("{} info page", NAME));
         e.description(format!(
             "Information about the bot itself. Use `{}help` to get a list of commands.",
-            PREFIX
+            *PREFIX
         ));
         e.field(
             "Author",

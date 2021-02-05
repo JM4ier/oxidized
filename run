@@ -1,4 +1,4 @@
 #! /bin/sh
 RUST_LOG=info \
 DISCORD_TOKEN=$(cat .discord_token) \
-cargo r
+cargo run -- --test

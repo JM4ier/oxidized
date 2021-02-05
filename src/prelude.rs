@@ -13,7 +13,18 @@ pub const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const BUILD_DATE: &str = env!("BUILD_DATE");
 pub const DISCORD_AUTHOR: &str = "<@!177498563637542921>";
-pub const PREFIX: &str = "=";
+
+lazy_static! {
+    pub static ref PREFIX: &'static str = {
+        let mut prefix = "=";
+        for arg in std::env::args() {
+            if arg == "-t" || arg == "--test" {
+                prefix = "==";
+            }
+        }
+        prefix
+    };
+}
 
 pub fn commands() -> Vec<&'static Command> {
     let mut groups = VecDeque::from(command_groups());
