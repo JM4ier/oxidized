@@ -15,14 +15,16 @@ pub const BUILD_DATE: &str = env!("BUILD_DATE");
 pub const DISCORD_AUTHOR: &str = "<@!177498563637542921>";
 
 lazy_static! {
-    pub static ref PREFIX: &'static str = {
-        let mut prefix = "=";
-        for arg in std::env::args() {
-            if arg == "-t" || arg == "--test" {
-                prefix = "==";
-            }
-        }
-        prefix
+    pub static ref TEST_INSTANCE: bool = std::env::args().any(|arg| arg == "-t" || arg == "--test");
+    pub static ref PREFIX: &'static str = if *TEST_INSTANCE { "==" } else { "=" };
+    pub static ref START_DATE: String = Utc::now().format("UTC %Y-%m-%d %H:%M:%S").to_string();
+    pub static ref SYSTEM_NAME: String = {
+        std::process::Command::new("sh")
+            .arg("-c")
+            .arg("uname -n")
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+            .unwrap_or(String::from("unknown"))
     };
 }
 
@@ -190,16 +192,4 @@ macro_rules! tryc {
 
 pub fn db() -> rusqlite::Result<Connection> {
     Connection::open("./oxidized.db")
-}
-
-lazy_static! {
-    pub static ref START_DATE: String = Utc::now().format("UTC %Y-%m-%d %H:%M:%S").to_string();
-    pub static ref SYSTEM_NAME: String = {
-        std::process::Command::new("sh")
-            .arg("-c")
-            .arg("uname -n")
-            .output()
-            .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-            .unwrap_or(String::from("unknown"))
-    };
 }
