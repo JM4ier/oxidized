@@ -14,7 +14,7 @@ impl PvpGame for UltimateGame {
     fn figures() -> Vec<String> {
         TTTField::figures()
     }
-    fn ai() -> Option<Box<dyn AiPlayer<Self>>> {
+    fn ai() -> Option<Box<dyn AiPlayer<Self> + Send + Sync>> {
         Some(Box::new(RandomPlayer::<Self>::default()))
     }
     fn is_empty(&self) -> bool {

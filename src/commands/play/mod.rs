@@ -9,6 +9,7 @@ mod elo;
 mod mcts;
 mod minimax;
 mod random_ai;
+mod runner;
 mod tictactoe;
 mod ultimate;
 use minimax::*;
@@ -122,7 +123,7 @@ pub trait PvpGame {
             None
         }
     }
-    fn ai() -> Option<Box<dyn AiPlayer<Self>>> {
+    fn ai() -> Option<Box<dyn AiPlayer<Self> + Send + Sync>> {
         None
     }
     fn title() -> &'static str;
@@ -142,6 +143,47 @@ pub struct GameContext {
 impl GameContext {
     fn next_turn(&mut self) {
         self.turn = 1 - self.turn;
+    }
+}
+
+#[async_trait]
+trait InputMethod {
+    type Input;
+    async fn receive_input(
+        &self,
+        ctx: &Context,
+        msg: &Message,
+        player: &UserId,
+    ) -> CommandResult<Self::Input>;
+}
+
+trait ReactionInput {
+    fn reactions() -> Vec<ReactionType>;
+}
+
+#[async_trait]
+impl<T: ReactionInput + Send + Sync> InputMethod for T {
+    type Input = usize;
+    async fn receive_input(
+        &self,
+        ctx: &Context,
+        msg: &Message,
+        player: &UserId,
+    ) -> CommandResult<Self::Input> {
+        let reaction = msg
+            .await_reaction(ctx)
+            .author_id(*player.as_u64())
+            .removed(true)
+            .timeout(Duration::from_secs_f64(10.0))
+            .await
+            .ok_or("no reaction")?;
+
+        let idx = T::reactions()
+            .into_iter()
+            .position(|e| e == reaction.as_inner_ref().emoji)
+            .ok_or("no fitting reaction")?;
+
+        Ok(idx)
     }
 }
 

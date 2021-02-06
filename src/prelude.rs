@@ -176,6 +176,23 @@ impl EmbedEdit for Message {
     }
 }
 
+#[async_trait]
+pub trait EmbedErrorReply {
+    async fn err_reply(&self, ctx: &Context, err: &str) -> CommandResult;
+}
+#[async_trait]
+impl EmbedErrorReply for Message {
+    async fn err_reply(&self, ctx: &Context, err: &str) -> CommandResult {
+        self.ereply(ctx, |e| {
+            e.color(Color::RED);
+            e.title("Error");
+            e.description(err)
+        })
+        .await?;
+        Err(err)?
+    }
+}
+
 // Tries to Pattern match an option
 //
 // If it fails, it continues in the next loop iteration

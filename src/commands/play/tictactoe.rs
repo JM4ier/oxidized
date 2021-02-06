@@ -82,7 +82,7 @@ impl PvpGame for TTTField {
 
         playing_field
     }
-    fn ai() -> Option<Box<dyn AiPlayer<Self>>> {
+    fn ai() -> Option<Box<dyn AiPlayer<Self> + Send + Sync>> {
         Some(Box::new(Minimax(TTTAI)))
     }
 }
