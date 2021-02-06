@@ -149,6 +149,9 @@ impl GameContext {
 #[async_trait]
 trait InputMethod {
     type Input;
+    async fn prepare(&self, _: &Context, _: &Message) -> CommandResult {
+        Ok(())
+    }
     async fn receive_input(
         &self,
         ctx: &Context,
@@ -157,13 +160,16 @@ trait InputMethod {
     ) -> CommandResult<Self::Input>;
 }
 
-trait ReactionInput {
-    fn reactions() -> Vec<ReactionType>;
-}
-
+struct ReactionInput(Vec<ReactionType>);
 #[async_trait]
-impl<T: ReactionInput + Send + Sync> InputMethod for T {
+impl InputMethod for ReactionInput {
     type Input = usize;
+    async fn prepare(&self, ctx: &Context, msg: &Message) -> CommandResult {
+        for r in self.0.iter() {
+            msg.react(ctx, r.clone()).await?;
+        }
+        Ok(())
+    }
     async fn receive_input(
         &self,
         ctx: &Context,
@@ -178,12 +184,35 @@ impl<T: ReactionInput + Send + Sync> InputMethod for T {
             .await
             .ok_or("no reaction")?;
 
-        let idx = T::reactions()
-            .into_iter()
-            .position(|e| e == reaction.as_inner_ref().emoji)
+        let idx = self
+            .0
+            .iter()
+            .position(|e| *e == reaction.as_inner_ref().emoji)
             .ok_or("no fitting reaction")?;
 
         Ok(idx)
+    }
+}
+
+struct TextInput<T>(dyn Send + Sync + Fn(&str) -> CommandResult<T>);
+#[async_trait]
+impl<T> InputMethod for TextInput<T> {
+    type Input = T;
+    async fn receive_input(
+        &self,
+        ctx: &Context,
+        msg: &Message,
+        player: &UserId,
+    ) -> CommandResult<Self::Input> {
+        let msg = msg
+            .channel_id
+            .await_reply(ctx)
+            .author_id(*player.as_u64())
+            .timeout(Duration::from_secs_f64(10.0))
+            .await
+            .ok_or("no message")?;
+
+        (self.0)(&msg.content)
     }
 }
 
@@ -403,7 +432,7 @@ async fn pvp_game<G: PvpGame + Send + Sync>(
             .map(|p| *p.id.as_u64())
             .collect::<Vec<u64>>();
 
-        log_game(game_name, server, &players, moves, winner)?;
+        log_game(game_name, server, &players, &moves, winner)?;
         elo::process_game(game_name, server, &players, winner)?;
     }
 
@@ -474,7 +503,7 @@ fn log_game(
     game: &str,
     server: u64,
     player_id: &[u64],
-    moves: Vec<u8>,
+    moves: &[u8],
     winner: Option<usize>,
 ) -> Result<()> {
     let player1 = format!("{}", player_id[0]);
