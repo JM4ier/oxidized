@@ -1,12 +1,12 @@
 use super::*;
 
-pub trait MinimaxAi<G: PvpGame + Clone> {
+pub trait MinimaxAi<G: PvpGame<usize> + Clone> {
     fn rate(&self, board: &G, player: usize) -> f64;
     fn depth(&self) -> usize;
     fn default_move(&self) -> usize;
 }
 
-pub fn minimax<G: PvpGame + Clone, M: MinimaxAi<G>>(
+pub fn minimax<G: PvpGame<usize> + Clone, M: MinimaxAi<G>>(
     mm: &M,
     board: &G,
     player: usize,
@@ -25,11 +25,10 @@ pub fn minimax<G: PvpGame + Clone, M: MinimaxAi<G>>(
     } else if depth == 0 {
         (mm.rate(board, player), 0)
     } else {
-        let moves = G::reactions().len();
         let mut max = 0.0_f64;
         let mut best_move = 0;
 
-        for mov in 0..moves {
+        for mov in board.possible_moves(player) {
             let mut eboard = board.clone();
             let status = eboard.make_move(mov, player);
             if status != GameState::Invalid {
@@ -46,7 +45,7 @@ pub fn minimax<G: PvpGame + Clone, M: MinimaxAi<G>>(
 
 pub struct Minimax<M>(pub M);
 
-impl<G: PvpGame + Clone, M: MinimaxAi<G>> AiPlayer<G> for Minimax<M> {
+impl<G: PvpGame<usize> + Clone, M: MinimaxAi<G>> AiPlayer<usize, G> for Minimax<M> {
     fn make_move(&mut self, board: &G, id: usize) -> usize {
         minimax(&self.0, board, id, self.0.depth() + 1).1
     }

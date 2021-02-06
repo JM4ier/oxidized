@@ -6,7 +6,7 @@ pub const EMPTY: &str = "⬛";
 pub const BORDER: &str = "⬜";
 pub const TIE: &str = "🟦";
 
-impl PvpGame for TTTField {
+impl PvpGame<usize> for TTTField {
     fn title() -> &'static str {
         "Tic Tac Toe"
     }
@@ -41,13 +41,13 @@ impl PvpGame for TTTField {
             self.status()
         }
     }
-    fn reactions() -> Vec<ReactionType> {
-        (1..10).map(number_emoji).collect()
+    fn input() -> Box<dyn InputMethod<usize> + Send + Sync> {
+        Box::new(ReactionInput((1..10).map(number_emoji).collect()))
     }
     fn figures() -> Vec<String> {
         vec![String::from("🟥"), String::from("🟨")]
     }
-    fn draw(&self, _: &GameContext) -> String {
+    fn draw(&self) -> String {
         let mut playing_field = String::new();
 
         for y in 0..3 {
@@ -82,8 +82,11 @@ impl PvpGame for TTTField {
 
         playing_field
     }
-    fn ai() -> Option<Box<dyn AiPlayer<Self> + Send + Sync>> {
+    fn ai() -> Option<Box<dyn AiPlayer<usize, Self> + Send + Sync>> {
         Some(Box::new(Minimax(TTTAI)))
+    }
+    fn possible_moves(&self, _: usize) -> Vec<usize> {
+        (0..9).filter(|&i| self[i].is_none()).collect()
     }
 }
 

@@ -1,16 +1,16 @@
 use super::*;
 
-pub struct GameRunner<G: PvpGame> {
+pub struct GameRunner<T: 'static, G: PvpGame<T>> {
     game: G,
     game_name: &'static str,
     description: &'static str,
     mode: GameMode,
-    players: Vec<Player<G>>,
+    players: Vec<Player<T, G>>,
     timeout: f64,
     turn: usize,
     board: Message,
     last_turn: Instant,
-    moves: Vec<u8>,
+    moves: Vec<T>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -28,12 +28,12 @@ impl GameMode {
     }
 }
 
-enum Player<G: PvpGame> {
+enum Player<T, G: PvpGame<T>> {
     Person(UserId),
-    Ai(Box<dyn AiPlayer<G> + Send + Sync>),
+    Ai(Box<dyn AiPlayer<T, G> + Send + Sync>),
 }
 
-impl<G: PvpGame> Player<G> {
+impl<T, G: PvpGame<T>> Player<T, G> {
     async fn id(&self, ctx: &Context) -> UserId {
         match self {
             Self::Person(id) => *id,
@@ -42,7 +42,7 @@ impl<G: PvpGame> Player<G> {
     }
 }
 
-impl<G: PvpGame> PartialEq for Player<G> {
+impl<T, G: PvpGame<T>> PartialEq for Player<T, G> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Person(me), Self::Person(other)) => me == other,
@@ -51,15 +51,12 @@ impl<G: PvpGame> PartialEq for Player<G> {
     }
 }
 
-impl<G: PvpGame> Player<G> {
+impl<T, G: PvpGame<T>> Player<T, G> {
     fn is_ai(&self) -> bool {
         match self {
             Self::Ai(_) => true,
             _ => false,
         }
-    }
-    fn is_person(&self) -> bool {
-        !self.is_ai()
     }
 }
 
@@ -73,7 +70,7 @@ fn get_description(game: &'static str) -> &'static str {
     cmd.options.desc.unwrap_or("\u{200b}")
 }
 
-impl<G: PvpGame + Send + Sync> GameRunner<G> {
+impl<Input: 'static + Clone, G: PvpGame<Input> + Send + Sync> GameRunner<Input, G> {
     pub async fn new<'a>(
         ctx: &'a Context,
         prompt: &'a Message,
@@ -136,7 +133,7 @@ impl<G: PvpGame + Send + Sync> GameRunner<G> {
             .ereply(ctx, |e| e.title(G::title()).description("Loading game..."))
             .await?;
 
-        todo!("prepare input method after creating the game board");
+        G::input().prepare(ctx, &board).await?;
 
         let players = vec![Player::Person(challenger), challenged];
 
@@ -192,7 +189,7 @@ impl<G: PvpGame + Send + Sync> GameRunner<G> {
             ),
         };
 
-        let board = self.game.draw(todo!());
+        let board = self.game.draw();
         let desc = self.description;
 
         self.board
@@ -207,7 +204,7 @@ impl<G: PvpGame + Send + Sync> GameRunner<G> {
     }
 
     /// runs the game
-    async fn run(&mut self, ctx: &Context) -> CommandResult {
+    pub async fn run(&mut self, ctx: &Context) -> CommandResult {
         'game: loop {
             self.last_turn = Instant::now();
             let play = loop {
@@ -217,29 +214,16 @@ impl<G: PvpGame + Send + Sync> GameRunner<G> {
                     break 'game;
                 }
 
-                let idx = match &mut self.players[self.turn] {
+                let play = match &mut self.players[self.turn] {
                     Player::Person(id) => {
-                        let reaction = self
-                            .board
-                            .await_reaction(ctx)
-                            .author_id(*id.as_u64())
-                            .removed(true)
-                            .timeout(Duration::from_secs_f64(10.0))
-                            .await;
-
-                        let reaction = tryc!(reaction);
-
-                        // if it is one of the given emojis, try to make that move
-                        tryc!(G::reactions()
-                            .into_iter()
-                            .position(|e| e == reaction.as_inner_ref().emoji))
+                        tryc!(G::input().receive_input(ctx, &self.board, id).await.ok())
                     }
                     Player::Ai(ai) => ai.make_move(&self.game, self.turn),
                 };
 
-                let state = self.game.make_move(idx, self.turn);
+                let state = self.game.make_move(play.clone(), self.turn);
                 if state != GameState::Invalid {
-                    self.moves.push(idx as u8);
+                    self.moves.push(play);
                     break state;
                 }
 
@@ -276,7 +260,8 @@ impl<G: PvpGame + Send + Sync> GameRunner<G> {
                 players.push(*p.id(ctx).await.as_u64());
             }
 
-            log_game(self.game_name, server, &players, &self.moves, winner)?;
+            // TODO
+            // log_game(self.game_name, server, &players, &self.moves, winner)?;
             elo::process_game(self.game_name, server, &players, winner)?;
         }
 

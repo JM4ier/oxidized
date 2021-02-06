@@ -7,15 +7,18 @@ pub struct UltimateGame {
     cell: usize,
 }
 
-impl PvpGame for UltimateGame {
+impl PvpGame<usize> for UltimateGame {
     fn title() -> &'static str {
         "Ultimate Tic Tac Toe"
     }
     fn figures() -> Vec<String> {
         TTTField::figures()
     }
-    fn ai() -> Option<Box<dyn AiPlayer<Self> + Send + Sync>> {
+    fn ai() -> Option<Box<dyn AiPlayer<usize, Self> + Send + Sync>> {
         Some(Box::new(RandomPlayer::<Self>::default()))
+    }
+    fn possible_moves(&self, player: usize) -> Vec<usize> {
+        self.field[self.cell].possible_moves(player)
     }
     fn is_empty(&self) -> bool {
         *self == Self::default()
@@ -31,8 +34,8 @@ impl PvpGame for UltimateGame {
         }
         wins.status()
     }
-    fn reactions() -> Vec<ReactionType> {
-        (1..10).map(number_emoji).collect()
+    fn input() -> Box<dyn InputMethod<usize> + Send + Sync> {
+        Box::new(ReactionInput((1..10).map(number_emoji).collect()))
     }
     fn make_move(&mut self, pos: usize, player: usize) -> GameState {
         if self.field[self.cell][pos].is_some() {
@@ -58,7 +61,7 @@ impl PvpGame for UltimateGame {
 
         self.status()
     }
-    fn draw(&self, _: &GameContext) -> String {
+    fn draw(&self) -> String {
         let mut field = String::new();
         for y in 0..3 {
             for iy in 0..3 {

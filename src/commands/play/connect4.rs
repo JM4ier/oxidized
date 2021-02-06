@@ -20,11 +20,11 @@ macro_rules! cart {
     };
 }
 
-impl PvpGame for Connect4 {
-    fn reactions() -> Vec<ReactionType> {
-        (0..COLS).map(number_emoji).collect()
+impl PvpGame<usize> for Connect4 {
+    fn input() -> Box<dyn InputMethod<usize> + Send + Sync> {
+        Box::new(ReactionInput((0..COLS).map(number_emoji).collect()))
     }
-    fn draw(&self, _: &GameContext) -> String {
+    fn draw(&self) -> String {
         let mut drawing = String::new();
         let figs = Self::figures();
 

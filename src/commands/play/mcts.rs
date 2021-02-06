@@ -1,4 +1,5 @@
 //! Monte Carlo Tree Search Implementation
+#![allow(unused)]
 
 use super::*;
 use rand::prelude::*;
@@ -62,7 +63,7 @@ impl Tree {
         let r = ((total_rollouts as f64).ln() / n).powf(0.5);
         x + r * VALUE_WEIGHT
     }
-    fn improve<G: PvpGame + Clone>(
+    fn improve<G: PvpGame<usize> + Clone>(
         &mut self,
         rollouts: usize,
         rng: &mut ThreadRng,
@@ -118,13 +119,10 @@ impl Tree {
         result.invert()
     }
 
-    fn new<G: PvpGame + Clone>(game: &G, player: usize) -> Self {
+    fn new<G: PvpGame<usize> + Clone>(game: &G, player: usize) -> Self {
         let mut new = Self::default();
-        for i in 0..G::reactions().len() {
-            let mut m_game = game.clone();
-            if m_game.make_move(i, 1 - player) != GameState::Invalid {
-                new.children.push(Child(i, None));
-            }
+        for i in game.possible_moves(player) {
+            new.children.push(Child(i, None));
         }
         new
     }
@@ -145,9 +143,9 @@ impl<T> TreeSearchAi<T> {
     }
 }
 
-fn roll_out<G: PvpGame + Clone>(rng: &mut ThreadRng, game: &G, player: usize) -> Stat {
+fn roll_out<G: PvpGame<usize> + Clone>(rng: &mut ThreadRng, game: &G, player: usize) -> Stat {
     let mut stat = Stat::default();
-    let mut moves = (0..G::reactions().len()).collect::<Vec<_>>();
+    let mut moves = game.possible_moves(player);
     for _ in 0..ROLLOUT_REPS {
         let mut game = game.clone();
         let mut active_player = player;
@@ -179,7 +177,7 @@ fn roll_out<G: PvpGame + Clone>(rng: &mut ThreadRng, game: &G, player: usize) ->
     stat
 }
 
-impl<T: PvpGame + Clone> AiPlayer<T> for TreeSearchAi<T> {
+impl<T: PvpGame<usize> + Clone> AiPlayer<usize, T> for TreeSearchAi<T> {
     fn make_move(&mut self, game: &T, player: usize) -> usize {
         let begin = Instant::now();
         let mut tree = Tree::new(game, player);
