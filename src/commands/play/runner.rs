@@ -261,6 +261,25 @@ impl<G: PvpGame + Send + Sync> GameRunner<G> {
         }
 
         self.draw(ctx).await?;
+
+        if self.mode == GameMode::Competitive {
+            let winner = match self.game.status() {
+                GameState::Win(p) => Some(p),
+                _ if self.forfeit() => Some(1 - self.turn),
+                _ => None,
+            };
+
+            let server = *self.board.guild_id.ok_or("no server id")?.as_u64();
+
+            let mut players = Vec::new();
+            for p in self.players.iter() {
+                players.push(*p.id(ctx).await.as_u64());
+            }
+
+            log_game(self.game_name, server, &players, &self.moves, winner)?;
+            elo::process_game(self.game_name, server, &players, winner)?;
+        }
+
         Ok(())
     }
 }
