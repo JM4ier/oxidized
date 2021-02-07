@@ -49,40 +49,47 @@ impl PvpGame<PMove> for Pentago {
     fn draw(&self) -> String {
         let mut drawing = String::new();
 
-        let empty = square(util::Color::Black);
-        let white = square(util::Color::White);
+        let black = square(util::Color::Black);
+        let blue = square(util::Color::Blue);
+        //let blue = " \u{fe0f}\u{20e3}";
 
-        drawing += empty;
-
+        let mut hor_border = String::from(blue);
         for x in 1..=6 {
-            drawing += &NUMBERS[x];
-            if x == 3 {
-                drawing += empty;
-            }
+            hor_border += &NUMBERS[x];
+            hor_border += blue;
         }
+        hor_border += "\n";
+
+        drawing += &hor_border;
 
         for y in 0..6 {
-            drawing += "\n";
+            drawing += &NUMBERS[y + 1];
 
-            if y == 3 {
-                drawing += empty;
-                for _ in 0..7 {
-                    drawing += white;
+            for x in 0..6 {
+                match self.field[x][y] {
+                    None => drawing += black,
+                    Some(p) => drawing += &Self::figures()[p],
                 }
-                drawing += "\n";
+                if x == 2 {
+                    drawing += blue;
+                } else if x != 5 {
+                    drawing += black;
+                }
             }
 
             drawing += &NUMBERS[y + 1];
-            for x in 0..6 {
-                if x == 3 {
-                    drawing += white;
+            drawing += "\n";
+            if y != 5 {
+                drawing += blue;
+                for x in 0..11 {
+                    drawing += if y == 2 || x == 5 { blue } else { black };
                 }
-                match self.field[x][y] {
-                    None => drawing += square(util::Color::Black),
-                    Some(p) => drawing += &Self::figures()[p],
-                }
+                drawing += blue;
+                drawing += "\n";
             }
         }
+
+        drawing += &hor_border;
 
         drawing += "\n\nSubfield layout:\n";
         drawing += &NUMBERS[1];

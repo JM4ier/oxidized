@@ -214,10 +214,12 @@ impl<Input: 'static + Clone, G: PvpGame<Input> + Send + Sync> GameRunner<Input, 
                     break 'game;
                 }
 
+                let timeout = Duration::from_secs_f64(self.time_left().max(10.0));
                 let play = match &mut self.players[self.turn] {
-                    Player::Person(id) => {
-                        tryc!(G::input().receive_input(ctx, &self.board, id).await.ok())
-                    }
+                    Player::Person(id) => tryc!(G::input()
+                        .receive_input(ctx, &self.board, id, timeout)
+                        .await
+                        .ok()),
                     Player::Ai(ai) => ai.make_move(&self.game, self.turn),
                 };
 

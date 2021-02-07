@@ -154,6 +154,7 @@ pub trait InputMethod<Input: 'static> {
         ctx: &Context,
         msg: &Message,
         player: &UserId,
+        timeout: Duration,
     ) -> CommandResult<Input>;
 }
 
@@ -171,12 +172,13 @@ impl InputMethod<usize> for ReactionInput {
         ctx: &Context,
         msg: &Message,
         player: &UserId,
+        timeout: Duration,
     ) -> CommandResult<usize> {
         let reaction = msg
             .await_reaction(ctx)
             .author_id(*player.as_u64())
             .removed(true)
-            .timeout(Duration::from_secs_f64(10.0))
+            .timeout(timeout)
             .await
             .ok_or("no reaction")?;
 
@@ -198,12 +200,13 @@ impl<T: 'static + Send + Sync> InputMethod<T> for TextInput<T> {
         ctx: &Context,
         msg: &Message,
         player: &UserId,
+        timeout: Duration,
     ) -> CommandResult<T> {
         let msg = msg
             .channel_id
             .await_reply(ctx)
             .author_id(*player.as_u64())
-            .timeout(Duration::from_secs_f64(10.0))
+            .timeout(timeout)
             .await
             .ok_or("no message")?;
 
