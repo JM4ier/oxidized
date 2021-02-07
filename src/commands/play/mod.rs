@@ -1,6 +1,5 @@
 use crate::ser::*;
 use crate::{prelude::*, tryc};
-use lazy_static::*;
 use rusqlite::{params, Result};
 use std::time::*;
 
@@ -8,13 +7,16 @@ mod connect4;
 mod elo;
 mod mcts;
 mod minimax;
+mod pentago;
 mod random_ai;
 mod runner;
 mod tictactoe;
 mod ultimate;
+mod util;
 use minimax::*;
 use random_ai::*;
 use runner::GameRunner;
+use util::*;
 
 macro_rules! make_games {
     ($($(#[$meta:meta])* game $name:ident ($struct:expr, $timeout:expr); )*) => {
@@ -87,6 +89,9 @@ You win if you have three in a row, column or diagonal in the big field."
     #[description("The classic Connect Four game.
 A person wins if four discs of the same color are arranged in a row, column, or diagonal.")]
     game connect4(connect4::Connect4::default(), 60.0);
+
+    #[description("The game is played on a 6×6 board divided into four 3×3 sub-boards (or quadrants). Taking turns, the two players place a marble of their color onto an unoccupied space on the board, and then rotate one of the sub-boards by 90 degrees either clockwise or anti-clockwise. A player wins by getting five of their marbles in a vertical, horizontal or diagonal row (either before or after the sub-board rotation in their move). **Important**: the game is played by text. Type `XYSR` to make a move. `X` and `Y` are the location of your next move. `S` is the number of the subfield you want to rotate. `R` is the direction of the rotation of the subfield (**A**nticlockwise or **C**lockwise). Example: `314A` (place marble on (3, 1), rotate field 4 90 degress anticlockwise).")]
+    game pentago(pentago::Pentago::default(), 60.0);
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -185,9 +190,9 @@ impl InputMethod<usize> for ReactionInput {
     }
 }
 
-struct TextInput<T>(dyn Send + Sync + Fn(&str) -> CommandResult<T>);
+struct TextInput<T>(pub Box<dyn Send + Sync + Fn(&str) -> CommandResult<T>>);
 #[async_trait]
-impl<T: 'static> InputMethod<T> for TextInput<T> {
+impl<T: 'static + Send + Sync> InputMethod<T> for TextInput<T> {
     async fn receive_input(
         &self,
         ctx: &Context,
@@ -202,7 +207,13 @@ impl<T: 'static> InputMethod<T> for TextInput<T> {
             .await
             .ok_or("no message")?;
 
-        (self.0)(&msg.content)
+        let parsed = (self.0)(&msg.content);
+
+        if parsed.is_ok() {
+            msg.delete(ctx).await.ok();
+        }
+
+        parsed
     }
 }
 
@@ -308,14 +319,4 @@ fn create_tables(game: &str) -> Result<()> {
         params!(),
     )?;
     Ok(())
-}
-
-lazy_static! {
-    pub static ref NUMBERS: Vec<String> = (0..10)
-        .map(|num| format!("{}\u{fe0f}\u{20e3}", num))
-        .collect();
-}
-
-fn number_emoji(num: usize) -> ReactionType {
-    ReactionType::Unicode(NUMBERS[num].clone())
 }
