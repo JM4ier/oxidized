@@ -1,4 +1,5 @@
-#! /bin/sh
+#! /bin/bash
+
 RUST_LOG=info \
 DISCORD_TOKEN=$(cat .discord_token) \
 cargo run -- --test

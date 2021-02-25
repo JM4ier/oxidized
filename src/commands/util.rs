@@ -2,6 +2,7 @@ use crate::prelude::*;
 use crate::ser::*;
 use rand::prelude::*;
 use rand::seq::SliceRandom;
+use tracing::*;
 
 #[command]
 #[min_args(1)]
@@ -118,5 +119,24 @@ async fn serverinfo(ctx: &Context, msg: &Message) -> CommandResult {
         e
     })
     .await?;
+    Ok(())
+}
+
+#[command]
+pub async fn serveremojis(ctx: &Context, msg: &Message) -> CommandResult {
+    let guild = msg.guild(ctx).await.ok_or("no guild")?;
+    let emojis = guild
+        .emojis
+        .iter()
+        .map(|e| format!("{} ", e.1.mention()))
+        .collect::<String>();
+
+    msg.ereply(ctx, |e| {
+        e.title("Emojis");
+        e.description(&emojis)
+    })
+    .await?;
+
+    event!(tracing::Level::INFO, "{}", emojis);
     Ok(())
 }

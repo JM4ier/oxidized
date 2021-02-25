@@ -173,6 +173,8 @@ impl<Input: 'static + Clone, G: PvpGame<Input> + Send + Sync> GameRunner<Input, 
             self.mention_player(ctx, 1).await,
         ];
 
+        let countdown = "<a:_:808040888235589772> <a:_:808040929515667526>";
+
         let status = match self.game.status() {
             _ if self.forfeit() => format!(
                 "{} won by inactivity of {}.",
@@ -182,7 +184,7 @@ impl<Input: 'static + Clone, G: PvpGame<Input> + Send + Sync> GameRunner<Input, 
             GameState::Win(p) => format!("{} won!", mentions[p]),
             GameState::Tie => String::from("It's a tie!"),
             _ => format!(
-                "{}({}) plays next.\nTime left: {} seconds (updated every few seconds).",
+                "{}({}) plays next.\nTime left: {} seconds. (updated every once in a while)",
                 mentions[self.turn].mention(),
                 G::figures()[self.turn],
                 self.time_left() as u64
@@ -214,7 +216,7 @@ impl<Input: 'static + Clone, G: PvpGame<Input> + Send + Sync> GameRunner<Input, 
                     break 'game;
                 }
 
-                let timeout = Duration::from_secs_f64(self.time_left().max(10.0));
+                let timeout = Duration::from_secs_f64(self.time_left().min(10.0));
                 let play = match &mut self.players[self.turn] {
                     Player::Person(id) => tryc!(G::input()
                         .receive_input(ctx, &self.board, id, timeout)

@@ -51,7 +51,6 @@ impl PvpGame<PMove> for Pentago {
 
         let black = square(util::Color::Black);
         let blue = square(util::Color::Blue);
-        //let blue = " \u{fe0f}\u{20e3}";
 
         let mut hor_border = String::from(blue);
         for x in 1..=6 {

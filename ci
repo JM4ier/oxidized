@@ -1,0 +1,7 @@
+#! /bin/bash
+
+while true
+do
+    find src | entr -crd ./run
+    sleep 0.1
+done
