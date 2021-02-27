@@ -207,6 +207,8 @@ impl<Input: 'static + Clone, G: PvpGame<Input> + Send + Sync> GameRunner<Input, 
 
     /// runs the game
     pub async fn run(&mut self, ctx: &Context) -> CommandResult {
+        let server = *self.board.guild_id.ok_or("no server id")?.as_u64();
+
         'game: loop {
             self.last_turn = Instant::now();
             let play = loop {
@@ -256,8 +258,6 @@ impl<Input: 'static + Clone, G: PvpGame<Input> + Send + Sync> GameRunner<Input, 
                 _ if self.forfeit() => Some(1 - self.turn),
                 _ => None,
             };
-
-            let server = *self.board.guild_id.ok_or("no server id")?.as_u64();
 
             let mut players = Vec::new();
             for p in self.players.iter() {
