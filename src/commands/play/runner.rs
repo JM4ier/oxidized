@@ -10,6 +10,7 @@ pub struct GameRunner<T: 'static, G: PvpGame<T>> {
     turn: usize,
     board: Message,
     last_turn: Instant,
+    guild_id: u64,
     moves: Vec<T>,
 }
 
@@ -80,6 +81,8 @@ impl<Input: 'static + Clone, G: PvpGame<Input> + Send + Sync> GameRunner<Input, 
     ) -> CommandResult<Self> {
         create_tables(game_name)?;
 
+        let guild_id = *prompt.guild_id.ok_or("no server id")?.as_u64();
+
         let challenger = prompt.author.id;
         let challenged = match prompt.mentions.iter().next() {
             Some(c) => c,
@@ -148,6 +151,7 @@ impl<Input: 'static + Clone, G: PvpGame<Input> + Send + Sync> GameRunner<Input, 
             board,
             last_turn: Instant::now(),
             moves: Vec::new(),
+            guild_id,
         })
     }
 
@@ -207,8 +211,6 @@ impl<Input: 'static + Clone, G: PvpGame<Input> + Send + Sync> GameRunner<Input, 
 
     /// runs the game
     pub async fn run(&mut self, ctx: &Context) -> CommandResult {
-        let server = *self.board.guild_id.ok_or("no server id")?.as_u64();
-
         'game: loop {
             self.last_turn = Instant::now();
             let play = loop {
@@ -266,7 +268,7 @@ impl<Input: 'static + Clone, G: PvpGame<Input> + Send + Sync> GameRunner<Input, 
 
             // TODO
             // log_game(self.game_name, server, &players, &self.moves, winner)?;
-            elo::process_game(self.game_name, server, &players, winner)?;
+            elo::process_game(self.game_name, self.guild_id, &players, winner)?;
         }
 
         Ok(())
