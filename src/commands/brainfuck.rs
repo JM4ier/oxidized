@@ -39,13 +39,26 @@ async fn brainfuck(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
     let program = args.single::<String>()?;
     let input = args.rest();
-    make_exec(ctx, msg, &input, &program).await
+    make_exec(ctx, msg, &input, &[program]).await
 }
 
-async fn make_exec(ctx: &Context, msg: &Message, input: &str, program: &str) -> CommandResult {
-    let program = make_program(&program)?;
+async fn make_exec(
+    ctx: &Context,
+    msg: &Message,
+    input: &str,
+    programs: &[String],
+) -> CommandResult {
+    assert!(programs.len() > 0);
 
-    let (iter, output, exit_code) = execute(&program, input.as_bytes(), 1.0, 1000);
+    let mut progs = Vec::new();
+    for program in programs.iter() {
+        let program = parse_instructions(&program)?;
+        let program = ProgContext::new(program);
+        progs.push(program);
+    }
+
+    let (iter, output, exit_code) =
+        ProgContext::execute_piped(&mut progs, input.as_bytes(), 1.0, 1000);
     let output = String::from_utf8_lossy(&output);
 
     msg.ereply(ctx, |e| {
@@ -58,7 +71,7 @@ async fn make_exec(ctx: &Context, msg: &Message, input: &str, program: &str) -> 
     Ok(())
 }
 
-fn make_program(string: &str) -> Result<Vec<Instr>, &'static str> {
+fn parse_instructions(string: &str) -> Result<Vec<Instr>, &'static str> {
     let mut program = Vec::new();
     let mut stack = VecDeque::new();
     for ch in string.chars() {
@@ -97,58 +110,121 @@ fn make_program(string: &str) -> Result<Vec<Instr>, &'static str> {
     }
 }
 
-fn execute(
-    code: &[Instr],
-    mut input: &[u8],
-    time_limit: f64,
-    char_limit: usize,
-) -> (usize, Vec<u8>, ExitCode) {
-    let mut output = "\u{200b}".as_bytes().to_owned();
-    let mut ptr = 0usize;
-    let mut data = vec![0u8; 30_000];
-    let mut instr_ptr = 0;
+struct ProgContext {
+    code: Vec<Instr>,
+    data: Vec<u8>,
+    ptr: usize,
+    ip: usize,
+}
 
-    let begin = Instant::now();
+#[derive(Copy, Clone)]
+enum Output {
+    Starved,
+    Terminated,
+    Timeout,
+    Value(u8),
+}
 
-    let mut iter = 0;
-    while begin.elapsed().as_secs_f64() < time_limit {
-        iter += 1;
-        let instr = code[instr_ptr];
-        match instr {
-            Instr::MoveRight => ptr = (ptr + 1) % data.len(),
-            Instr::MoveLeft => ptr = (ptr + data.len() - 1) % data.len(),
-            Instr::Increment => data[ptr] = data[ptr].wrapping_add(1),
-            Instr::Decrement => data[ptr] = data[ptr].wrapping_sub(1),
-            Instr::Input => {
-                if input.len() > 0 {
-                    data[ptr] = input[0];
-                    input = &input[1..];
-                } else {
-                    data[ptr] = 0;
-                }
-            }
-            Instr::Output => {
-                if output.len() < char_limit {
-                    output.push(data[ptr])
-                }
-            }
-            Instr::JumpRight(target) => {
-                if data[ptr] == 0 {
-                    instr_ptr = target;
-                    continue;
-                }
-            }
-            Instr::JumpLeft(target) => {
-                if data[ptr] > 0 {
-                    instr_ptr = target;
-                    continue;
-                }
-            }
-            Instr::Terminate => return (iter, output, ExitCode::Success),
+impl ProgContext {
+    fn new(code: Vec<Instr>) -> Self {
+        Self {
+            code,
+            data: vec![0u8; 30_000],
+            ptr: 0,
+            ip: 0,
         }
-        instr_ptr += 1;
     }
-    (iter, output, ExitCode::Timeout)
+
+    fn next_output(&mut self, input: &mut Option<u8>, iter: &mut usize, until: Instant) -> Output {
+        while Instant::now() < until {
+            *iter += 1;
+            let instr = self.code[self.ip];
+            match instr {
+                Instr::MoveRight => self.ptr = (self.ptr + 1) % self.data.len(),
+                Instr::MoveLeft => self.ptr = (self.ptr + self.data.len() - 1) % self.data.len(),
+                Instr::Increment => self.data[self.ptr] = self.data[self.ptr].wrapping_add(1),
+                Instr::Decrement => self.data[self.ptr] = self.data[self.ptr].wrapping_sub(1),
+                Instr::Input => match input {
+                    None => return Output::Starved,
+                    Some(val) => {
+                        self.data[self.ptr] = *val;
+                        *input = None;
+                    }
+                },
+                Instr::Output => {
+                    self.ip += 1;
+                    return Output::Value(self.data[self.ptr]);
+                }
+                Instr::JumpRight(target) => {
+                    if self.data[self.ptr] == 0 {
+                        self.ip = target;
+                        continue;
+                    }
+                }
+                Instr::JumpLeft(target) => {
+                    if self.data[self.ptr] > 0 {
+                        self.ip = target;
+                        continue;
+                    }
+                }
+                Instr::Terminate => return Output::Terminated,
+            }
+            self.ip += 1;
+        }
+        Output::Timeout
+    }
+
+    fn execute_piped(
+        progs: &mut [Self],
+        user_input: &[u8],
+        time_limit: f64,
+        char_limit: usize,
+    ) -> (usize, Vec<u8>, ExitCode) {
+        assert!(progs.len() > 0);
+
+        let end = Instant::now() + Duration::from_secs_f64(time_limit);
+        let mut pid = progs.len() - 1;
+        let mut iter = 0;
+
+        let mut user_input = user_input.iter().chain(Some(0).iter().cycle());
+        let mut prog_input = vec![None; progs.len()];
+
+        let mut output = Vec::new();
+
+        loop {
+            let out = progs[pid].next_output(&mut prog_input[pid], &mut iter, end);
+            match out {
+                Output::Starved => {
+                    if pid == 0 {
+                        prog_input[pid] = Some(*user_input.next().unwrap());
+                    } else {
+                        pid -= 1;
+                    }
+                }
+                Output::Terminated => {
+                    if pid == progs.len() - 1 {
+                        return (iter, output, ExitCode::Success);
+                    } else {
+                        prog_input[pid + 1] = Some(0);
+                        pid += 1;
+                    }
+                }
+                Output::Timeout => {
+                    return (iter, output, ExitCode::Timeout);
+                }
+                Output::Value(val) => {
+                    if pid == progs.len() - 1 {
+                        if output.len() < char_limit {
+                            output.push(val);
+                        }
+                    } else {
+                        prog_input[pid + 1] = Some(val);
+                        pid += 1;
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn create_table() -> Result<()> {
@@ -264,8 +340,13 @@ pub async fn load(ctx: &Context, msg: &Message) -> CommandResult {
 #[bucket("brainfuck")]
 pub async fn run(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
-    let name = args.single::<String>()?;
-    let program = load_program(&name, msg)?;
-    let input = args.rest();
-    make_exec(ctx, msg, &input, &program).await
+    let prog_names = args.single::<String>()?;
+    let prog_names = prog_names.split('|');
+    let mut progs = Vec::new();
+
+    for prog in prog_names {
+        progs.push(load_program(prog, msg)?);
+    }
+
+    make_exec(ctx, msg, args.rest(), &progs).await
 }
