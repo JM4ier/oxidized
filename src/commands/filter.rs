@@ -14,15 +14,11 @@ pub async fn only_in_spam(
         .await
         .map_err(|_| Reason::Unknown)?;
 
-    match channel {
-        Channel::Guild(channel) => {
-            let name = channel.name;
-            if name.contains("bot") || name.contains("spam") {
-                Ok(())
-            } else {
-                Err(Reason::Unknown)
-            }
+    if let Channel::Guild(channel) = channel {
+        let name = channel.name;
+        if !name.contains("bot") && !name.contains("spam") {
+            return Err(Reason::Unknown);
         }
-        _ => Ok(()),
     }
+    Ok(())
 }
