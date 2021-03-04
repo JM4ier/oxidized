@@ -3,13 +3,14 @@ use crate::ser::*;
 use crate::ShardManagerContainer;
 use std::fs::File;
 use std::io::Read;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use tracing::*;
 
 #[group]
 #[owners_only]
 #[prefix = "sudo"]
-#[commands(quit, repeat, delete, debug, status, nick, cat, delet)]
+#[commands(quit, repeat, delete, debug, status, nick, cat, delet, stop_spam)]
 pub struct Management;
 
 #[command]
@@ -37,18 +38,33 @@ async fn quit(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+lazy_static! {
+    static ref STOP_SPAM: AtomicU64 = AtomicU64::new(0);
+}
+
 #[command]
 #[min_args(2)]
 #[description = "Repeats a message n times."]
 #[usage = "<n> <message>"]
 #[example = "5 Hello, World!"]
 async fn repeat(ctx: &Context, msg: &Message) -> CommandResult {
+    let initial_spam = STOP_SPAM.load(Ordering::SeqCst);
     let mut args = msg.args();
     let count = args.single::<u32>()?;
     let word = args.rest();
     for _ in 0..count {
         msg.channel_id.say(&ctx.http, &word).await?;
+
+        if initial_spam != STOP_SPAM.load(Ordering::SeqCst) {
+            break;
+        }
     }
+    Ok(())
+}
+
+#[command("stopspam")]
+async fn stop_spam(_: &Context, _: &Message) -> CommandResult {
+    STOP_SPAM.fetch_add(1, Ordering::SeqCst);
     Ok(())
 }
 
