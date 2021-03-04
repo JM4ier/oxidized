@@ -59,7 +59,11 @@ async fn make_exec(
 
     let (iter, output, exit_code) =
         ProgContext::execute_piped(&mut progs, input.as_bytes(), 1.0, 1000);
-    let output = String::from_utf8_lossy(&output);
+    let mut output = String::from_utf8_lossy(&output);
+
+    if output.len() == 0 {
+        output = "\u{200b}".into();
+    }
 
     msg.ereply(ctx, |e| {
         e.title("Brainfuck Program Execution");
@@ -340,11 +344,16 @@ pub async fn load(ctx: &Context, msg: &Message) -> CommandResult {
 #[bucket("brainfuck")]
 pub async fn run(ctx: &Context, msg: &Message) -> CommandResult {
     let mut args = msg.args();
+
     let prog_names = args.single::<String>()?;
     let prog_names = prog_names.split('|');
+
     let mut progs = Vec::new();
 
-    for prog in prog_names {
+    for (idx, prog) in prog_names.enumerate() {
+        if idx > 20 {
+            Err("memory abuse?")?;
+        }
         progs.push(load_program(prog, msg)?);
     }
 
