@@ -9,7 +9,7 @@ use tracing::*;
 #[group]
 #[owners_only]
 #[prefix = "sudo"]
-#[commands(quit, repeat, delete, debug, status, nick, cat)]
+#[commands(quit, repeat, delete, debug, status, nick, cat, delet)]
 pub struct Management;
 
 #[command]
@@ -132,10 +132,31 @@ async fn cat(ctx: &Context, msg: &Message) -> CommandResult {
     let mut file = File::open(file_name)?;
     let mut content = String::new();
     file.read_to_string(&mut content)?;
-    msg.ereply(ctx, |e| {
-        e.title(file_name);
-        e.field("\u{200b}", content, false)
-    })
-    .await?;
+    msg.reply(ctx, content).await?;
+    Ok(())
+}
+
+#[command]
+#[description = "deletes a message"]
+async fn delet(ctx: &Context, msg: &Message) -> CommandResult {
+    let to_delet = msg
+        .message_reference
+        .as_ref()
+        .and_then(|m| m.message_id)
+        .ok_or("no reference to earlier message")?;
+
+    msg.delete(ctx).await?;
+
+    let around_msgs = msg
+        .channel_id
+        .messages(ctx, |r| r.around(to_delet).limit(1))
+        .await?;
+
+    for msg in around_msgs {
+        if msg.id == to_delet {
+            msg.delete(ctx).await?;
+        }
+    }
+
     Ok(())
 }

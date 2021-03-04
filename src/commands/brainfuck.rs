@@ -1,3 +1,4 @@
+use super::filter::*;
 use crate::prelude::*;
 use crate::ser::*;
 use rusqlite::{params, Result};
@@ -24,6 +25,7 @@ enum Instr {
 }
 
 #[group]
+#[checks(Spam)]
 #[commands(brainfuck, store, load, run)]
 pub struct Brainfuck;
 
