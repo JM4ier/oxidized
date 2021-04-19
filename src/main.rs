@@ -57,6 +57,11 @@ pub async fn on_dispatch_error(ctx: &Context, msg: &Message, _: DispatchError) {
 }
 
 #[hook]
+pub async fn before(_ctx: &Context, msg: &Message, _cmd: &str) -> bool {
+    *msg.channel_id.as_u64() != 819966095070330950
+}
+
+#[hook]
 pub async fn after(ctx: &Context, msg: &Message, _: &str, err: Result<(), CommandError>) {
     let reaction = match err {
         Err(err) => {
@@ -122,6 +127,7 @@ async fn main() {
         .help(&HELP)
         .configure(|c| c.owners(owners).prefix(&PREFIX))
         .on_dispatch_error(on_dispatch_error)
+        .before(before)
         .after(after)
         .bucket("brainfuck", |b| b.time_span(10).limit(5))
         .await
