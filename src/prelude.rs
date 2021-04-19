@@ -85,9 +85,9 @@ impl MessageArgs for Message {
 /// concatenates a list of strings into larger strings, while respecting the maximum length of an
 /// embed field.
 ///
-/// Note: Strings must not be longer than 2000 characters.
+/// Note: Strings must not be longer than 1000 characters.
 pub fn split_into_fields(parts: &[String], default: &str) -> Vec<String> {
-    const LIMIT: usize = 2000;
+    const LIMIT: usize = 1000;
     let mut fields = Vec::new();
     let mut field = String::new();
     for part in parts.iter() {
@@ -204,53 +204,6 @@ macro_rules! tryc {
         } else {
             continue;
         }
-    };
-}
-
-trait TuplePrepend<T> {
-    type ResultType;
-    fn prepend(self, t: T) -> Self::ResultType;
-}
-
-impl<T> TuplePrepend<T> for () {
-    type ResultType = (T,);
-    fn prepend(self, t: T) -> Self::ResultType {
-        (t,)
-    }
-}
-
-macro_rules! _impl_tuple_prepend {
-    ( () ) => {};
-    ( ($t:ident $(, $typ:ident)* ) ) => {
-        impl<$t, $($typ,)* TT> TuplePrepend<TT> for ($t, $($typ,)*) {
-            type ResultType = (TT, $t, $($typ),*);
-            #[inline]
-            fn prepend(self, t: TT) -> Self::ResultType {
-                #[allow(non_snake_case)]
-                let ($t, $($typ,)*) = self;
-                (t, $t, $($typ,)*)
-            }
-        }
-        _impl_tuple_prepend!(($($typ),*));
-    }
-}
-_impl_tuple_prepend!((
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z
-));
-
-/// Produces an iterator of the cartesian product of the input iterators
-#[macro_export]
-macro_rules! cart {
-    ($iter:expr) => {
-        $iter
-    };
-    ($a:expr, $b:expr) => {
-        $a.flat_map(move |a| $b.map(move |b| (a, b)))
-    };
-    ($head:expr, $($tail:expr),+) => {
-        cart!($head, cart!($($tail),+)).map(
-            |(head, tail)| tail.prepend(head)
-        )
     };
 }
 

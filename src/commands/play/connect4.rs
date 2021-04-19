@@ -1,5 +1,5 @@
 use super::*;
-use crate::cart;
+use cartesian::*;
 
 #[derive(Default, PartialEq, Eq)]
 pub struct Connect4 {

@@ -1,6 +1,6 @@
 use super::GameState;
-use crate::cart;
 use crate::ser::*;
+use cartesian::*;
 
 pub fn n_in_a_row(
     rows: usize,
@@ -11,7 +11,7 @@ pub fn n_in_a_row(
     let n = n as isize;
     let mut filled = true;
 
-    for (x, y) in cart!(0..cols, 0..rows) {
+    for (x, y) in cartesian!(0..cols, 0..rows) {
         filled &= index(x, y).is_some();
 
         let color = match index(x, y) {
@@ -19,7 +19,7 @@ pub fn n_in_a_row(
             None => continue,
         };
 
-        'dir: for (dx, dy) in cart!(-1..=1, -1..=1) {
+        'dir: for (dx, dy) in cartesian!(-1..=1, -1..=1) {
             if dx == 0 && dy == 0 {
                 continue;
             }
